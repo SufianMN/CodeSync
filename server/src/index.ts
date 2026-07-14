@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import scalar from '@scalar/fastify-api-reference';
+import { prisma } from './utils/prisma';
 const server = Fastify({
   logger: {
     level: 'info',
@@ -33,7 +34,18 @@ const start = async () => {
     });
 
     server.get('/api/health', async (request, reply) => {
-      return { success: true, data: { status: 'ok', timestamp: new Date() } };
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        return {
+          success: true,
+          data: { status: 'ok', database: 'connected', timestamp: new Date() },
+        };
+      } catch (dbError) {
+        server.log.error(dbError);
+        return reply
+          .status(503)
+          .send({ success: false, error: { message: 'Database disconnected', issues: [] } });
+      }
     });
 
     await server.listen({ port: 3000, host: '0.0.0.0' });
