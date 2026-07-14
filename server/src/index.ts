@@ -2,7 +2,10 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import scalar from '@scalar/fastify-api-reference';
+import cookie from '@fastify/cookie';
 import { prisma } from './utils/prisma';
+import authRoutes from './routes/auth.routes';
+
 const server = Fastify({
   logger: {
     level: 'info',
@@ -15,8 +18,11 @@ const server = Fastify({
 const start = async () => {
   try {
     await server.register(cors, {
-      origin: true, // Allow all origins for MVP
+      origin: 'http://localhost:5173', // Vite default port
+      credentials: true, // Important for cookies
     });
+
+    await server.register(cookie);
 
     await server.register(swagger, {
       openapi: {
@@ -31,7 +37,14 @@ const start = async () => {
 
     await server.register(scalar, {
       routePrefix: '/docs',
+      configuration: {
+        spec: {
+          content: () => server.swagger(),
+        },
+      },
     });
+
+    server.register(authRoutes, { prefix: '/api/auth' });
 
     server.get('/api/health', async (request, reply) => {
       try {
