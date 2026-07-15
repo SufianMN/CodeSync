@@ -1,0 +1,72 @@
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Code2 } from 'lucide-react';
+import { SaveState } from '../../hooks/useAutosave';
+
+interface RoomHeaderProps {
+  roomName: string;
+  language: string;
+  onLanguageChange: (lang: string) => void;
+  saveState: SaveState;
+}
+
+const LANGUAGES = [
+  { value: 'cpp', label: 'C++' },
+  { value: 'java', label: 'Java' },
+  { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'go', label: 'Go' },
+  { value: 'rust', label: 'Rust' },
+];
+
+export function RoomHeader({ roomName, language, onLanguageChange, saveState }: RoomHeaderProps) {
+  return (
+    <header className="flex flex-shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900 p-4 shadow-sm z-10">
+      <div className="flex items-center space-x-4">
+        <Link to="/dashboard" className="rounded p-1 hover:bg-gray-800 transition">
+          <ArrowLeft className="h-5 w-5 text-gray-400" />
+        </Link>
+        <div className="flex items-center space-x-2">
+          <Code2 className="h-5 w-5 text-blue-500" />
+          <h1 className="font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
+            {roomName}
+          </h1>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4 sm:space-x-6">
+        <div className="hidden sm:flex items-center space-x-2 text-sm font-medium">
+          <span
+            className={`
+              flex items-center space-x-1
+              ${saveState === 'Saved' ? 'text-green-400' : ''}
+              ${saveState === 'Saving...' ? 'text-blue-400' : ''}
+              ${saveState === 'Unsaved Changes' ? 'text-yellow-400' : ''}
+              ${saveState === 'Failed to save' ? 'text-red-400' : ''}
+            `}
+          >
+            <span className="relative flex h-2 w-2">
+              {(saveState === 'Saving...' || saveState === 'Unsaved Changes') && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
+              )}
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
+            </span>
+            <span>{saveState}</span>
+          </span>
+        </div>
+
+        <select
+          value={language}
+          onChange={(e) => onLanguageChange(e.target.value)}
+          className="rounded border border-gray-700 bg-gray-800 p-1.5 text-sm font-medium text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {LANGUAGES.map((lang) => (
+            <option key={lang.value} value={lang.value}>
+              {lang.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </header>
+  );
+}

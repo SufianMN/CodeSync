@@ -31,3 +31,17 @@ export const updateRoom = async (id: string, name: string): Promise<Room> => {
 export const deleteRoom = async (id: string): Promise<void> => {
   await apiClient.delete(`/rooms/${id}`);
 };
+
+export interface RoomCode {
+  language: string;
+  code: string;
+}
+
+export const getRoomCode = async (id: string): Promise<RoomCode> => {
+  const response = await apiClient.get(`/rooms/${id}/code`);
+  return response.data;
+};
+
+export const updateRoomCode = async (id: string, code: string, language: string): Promise<void> => {
+  await apiClient.put(`/rooms/${id}/code`, { code, language });
+};

@@ -10,4 +10,7 @@ export default async function roomRoutes(server: FastifyInstance) {
   server.get('/:id', RoomController.getOne);
   server.patch('/:id', RoomController.update);
   server.delete('/:id', RoomController.delete);
+
+  server.get('/:id/code', RoomController.getCode);
+  server.put('/:id/code', RoomController.updateCode);
 }

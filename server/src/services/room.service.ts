@@ -134,4 +134,64 @@ export class RoomService {
     };
     return extMap[language.toLowerCase()] || 'txt';
   }
+
+  static async getRoomCode(roomId: string, userId: string) {
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      include: { files: { take: 1 } },
+    });
+
+    if (!room) {
+      throw Object.assign(new Error('Room not found'), { statusCode: 404 });
+    }
+
+    if (room.ownerId !== userId) {
+      throw Object.assign(new Error('Forbidden'), { statusCode: 403 });
+    }
+
+    const primaryFile = room.files[0];
+    if (!primaryFile) {
+      throw Object.assign(new Error('No code file found for this room'), { statusCode: 404 });
+    }
+
+    return {
+      language: primaryFile.language,
+      code: primaryFile.content,
+    };
+  }
+
+  static async updateRoomCode(
+    roomId: string,
+    userId: string,
+    data: { code: string; language: string },
+  ) {
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      include: { files: { take: 1 } },
+    });
+
+    if (!room) {
+      throw Object.assign(new Error('Room not found'), { statusCode: 404 });
+    }
+
+    if (room.ownerId !== userId) {
+      throw Object.assign(new Error('Forbidden'), { statusCode: 403 });
+    }
+
+    const primaryFile = room.files[0];
+    if (!primaryFile) {
+      throw Object.assign(new Error('No code file found for this room'), { statusCode: 404 });
+    }
+
+    await prisma.roomFile.update({
+      where: { id: primaryFile.id },
+      data: {
+        content: data.code,
+        language: data.language,
+        filename: `main.${this.getExtension(data.language)}`,
+      },
+    });
+
+    return { success: true };
+  }
 }

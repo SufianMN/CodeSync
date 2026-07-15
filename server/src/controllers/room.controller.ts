@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { RoomService } from '../services/room.service';
-import { createRoomSchema, updateRoomSchema } from '../schemas/room.schema';
+import { createRoomSchema, updateRoomSchema, updateCodeSchema } from '../schemas/room.schema';
 import { ZodError } from 'zod';
 
 export class RoomController {
@@ -71,6 +71,43 @@ export class RoomController {
       await RoomService.deleteRoom(roomId, userId);
       return reply.send({ message: 'Room deleted successfully' });
     } catch (error: any) {
+      if (error.statusCode) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  }
+
+  static async getCode(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.userId;
+      const roomId = request.params.id;
+      const result = await RoomService.getRoomCode(roomId, userId);
+      return reply.send(result);
+    } catch (error: any) {
+      if (error.statusCode) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      request.log.error(error);
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  }
+
+  static async updateCode(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ) {
+    try {
+      const data = updateCodeSchema.parse(request.body);
+      const userId = (request as any).user.userId;
+      const roomId = request.params.id;
+      const result = await RoomService.updateRoomCode(roomId, userId, data);
+      return reply.send(result);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return reply.status(400).send({ error: error.issues });
+      }
       if (error.statusCode) {
         return reply.status(error.statusCode).send({ error: error.message });
       }

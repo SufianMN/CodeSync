@@ -19,3 +19,9 @@ export const updateRoomSchema = z.object({
 
 export type CreateRoomInput = z.infer<typeof createRoomSchema>;
 export type UpdateRoomInput = z.infer<typeof updateRoomSchema>;
+
+export const updateCodeSchema = z.object({
+  code: z.string(),
+  language: z.string().min(1),
+});
+export type UpdateCodeInput = z.infer<typeof updateCodeSchema>;
