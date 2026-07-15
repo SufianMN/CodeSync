@@ -19,7 +19,7 @@ export function Login() {
     try {
       const response = await apiClient.post('/auth/login', { email, password });
       login(response.data.user);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to login');
     } finally {

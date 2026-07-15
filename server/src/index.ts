@@ -5,6 +5,7 @@ import scalar from '@scalar/fastify-api-reference';
 import cookie from '@fastify/cookie';
 import { prisma } from './utils/prisma';
 import authRoutes from './routes/auth.routes';
+import roomRoutes from './routes/room.routes';
 
 const server = Fastify({
   logger: {
@@ -20,6 +21,8 @@ const start = async () => {
     await server.register(cors, {
       origin: 'http://localhost:5173', // Vite default port
       credentials: true, // Important for cookies
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     });
 
     await server.register(cookie);
@@ -44,7 +47,8 @@ const start = async () => {
       },
     });
 
-    server.register(authRoutes, { prefix: '/api/auth' });
+    await server.register(authRoutes, { prefix: '/api/auth' });
+    await server.register(roomRoutes, { prefix: '/api/rooms' });
 
     server.get('/api/health', async (request, reply) => {
       try {
