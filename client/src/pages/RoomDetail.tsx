@@ -1,10 +1,14 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getRoomById, getRoomCode, Room } from '../api/rooms';
 import { useAutosave } from '../hooks/useAutosave';
 import { useCollaboration } from '../hooks/useCollaboration';
+import { usePresence } from '../hooks/usePresence';
 import { RoomHeader } from '../components/RoomHeader/RoomHeader';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
+import { ParticipantPanel } from '../components/ParticipantPanel/ParticipantPanel';
+import { throttle, debounce } from '../utils/throttle';
+import { socket } from '../socket/socket';
 
 export function RoomDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,13 +20,53 @@ export function RoomDetail() {
 
   const { saveState, onEdit, saveToBackend } = useAutosave(id || '');
 
-  // Track initialization to avoid saving on first render
   const isInitialized = useRef(false);
   const isRemoteUpdate = useRef(false);
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const decorationsCollectionRef = useRef<any>(null);
 
-  const handleEditorMount = (editor: any) => {
+  const { participants } = usePresence(id || '');
+
+  const handleTypingStop = useCallback(
+    debounce(() => {
+      if (socket.connected && id) {
+        socket.emit('typing:stop', { roomId: id });
+      }
+    }, 2000),
+    [id],
+  );
+
+  const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    editor.onDidChangeCursorPosition(
+      throttle((e: any) => {
+        if (socket.connected && id) {
+          socket.emit('cursor:update', {
+            roomId: id,
+            cursor: { line: e.position.lineNumber, column: e.position.column },
+          });
+        }
+      }, 50),
+    );
+
+    editor.onDidChangeCursorSelection(
+      throttle((e: any) => {
+        if (socket.connected && id) {
+          socket.emit('selection:update', {
+            roomId: id,
+            selection: {
+              startLineNumber: e.selection.startLineNumber,
+              startColumn: e.selection.startColumn,
+              endLineNumber: e.selection.endLineNumber,
+              endColumn: e.selection.endColumn,
+            },
+          });
+        }
+      }, 50),
+    );
   };
 
   const { status: connectionStatus, broadcastChange } = useCollaboration(
@@ -46,6 +90,89 @@ export function RoomDetail() {
     },
   );
 
+  // Handle remote cursors and selections
+  useEffect(() => {
+    if (!editorRef.current || !monacoRef.current) return;
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+
+    const decorations: any[] = [];
+    const styleId = 'monaco-presence-styles';
+    let styleEl = document.getElementById(styleId);
+
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+
+    let css = '';
+
+    participants.forEach((p) => {
+      if (p.socketId === socket.id) return;
+
+      css += `
+        .selection-${p.socketId} {
+          background-color: ${p.color}40;
+        }
+        .cursor-${p.socketId} {
+          border-left: 2px solid ${p.color};
+          position: relative;
+          z-index: 9;
+        }
+      `;
+
+      if (
+        p.selection &&
+        (p.selection.startLineNumber !== p.selection.endLineNumber ||
+          p.selection.startColumn !== p.selection.endColumn)
+      ) {
+        decorations.push({
+          range: new monaco.Range(
+            p.selection.startLineNumber,
+            p.selection.startColumn,
+            p.selection.endLineNumber,
+            p.selection.endColumn,
+          ),
+          options: {
+            className: `selection-${p.socketId}`,
+            hoverMessage: { value: p.username },
+          },
+        });
+      }
+
+      if (p.cursor) {
+        decorations.push({
+          range: new monaco.Range(p.cursor.line, p.cursor.column, p.cursor.line, p.cursor.column),
+          options: {
+            className: `cursor-${p.socketId}`,
+            hoverMessage: { value: p.username },
+          },
+        });
+      }
+    });
+
+    styleEl.innerHTML = css;
+
+    if (!decorationsCollectionRef.current) {
+      decorationsCollectionRef.current = editor.createDecorationsCollection(decorations);
+    } else {
+      decorationsCollectionRef.current.set(decorations);
+    }
+
+    return () => {
+      // Don't remove the style element completely on every render, just clear it if needed
+      // Cleanup happens when component unmounts
+    };
+  }, [participants]);
+
+  useEffect(() => {
+    return () => {
+      const styleEl = document.getElementById('monaco-presence-styles');
+      if (styleEl) styleEl.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (!id) return;
     const fetchInitialData = async () => {
@@ -54,7 +181,6 @@ export function RoomDetail() {
         setRoom(roomData);
         setCode(codeData.code);
         setLanguage(codeData.language);
-        // Using a short timeout to prevent Monaco's initial layout events from triggering an immediate onEdit save
         setTimeout(() => {
           isInitialized.current = true;
         }, 500);
@@ -76,6 +202,12 @@ export function RoomDetail() {
     }
 
     setCode(newCode);
+
+    if (socket.connected && id) {
+      socket.emit('typing:start', { roomId: id });
+      handleTypingStop();
+    }
+
     if (isInitialized.current) {
       onEdit(newCode, language);
       broadcastChange(newCode);
@@ -85,7 +217,6 @@ export function RoomDetail() {
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage);
     if (isInitialized.current) {
-      // Save immediately on language change
       saveToBackend(code, newLanguage);
     }
   };
@@ -118,19 +249,22 @@ export function RoomDetail() {
         saveState={saveState}
         connectionStatus={connectionStatus}
       />
-      <main className="flex-1 relative">
-        <div className="absolute inset-0 hidden md:block">
-          <MonacoEditor
-            language={language}
-            value={code}
-            onChange={handleEditorChange}
-            onMount={handleEditorMount}
-          />
-        </div>
-        <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
-          <p className="text-gray-400">Editing is best experienced on desktop.</p>
-        </div>
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        <ParticipantPanel participants={participants} />
+        <main className="flex-1 relative">
+          <div className="absolute inset-0 hidden md:block">
+            <MonacoEditor
+              language={language}
+              value={code}
+              onChange={handleEditorChange}
+              onMount={handleEditorMount}
+            />
+          </div>
+          <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
+            <p className="text-gray-400">Editing is best experienced on desktop.</p>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

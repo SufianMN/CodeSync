@@ -1,6 +1,8 @@
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from './auth';
 import { RoomService } from '../services/room.service';
+import { PresenceManager } from './presence';
+import { prisma } from '../utils/prisma';
 
 export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) => {
   const userId = socket.user?.userId;
@@ -14,6 +16,12 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
       socket.join(roomId);
       console.log(`Joined room ${roomId}`);
 
+      // Fetch user details
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        PresenceManager.addParticipant(roomId, socket.id, userId, user.name);
+      }
+
       // Fetch the latest code state from the database
       const roomState = await RoomService.getRoomCode(roomId, userId);
 
@@ -23,10 +31,10 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
         language: roomState.language,
       });
 
-      socket.to(roomId).emit('user-joined', { userId }); // Optional, but good for future
+      // Broadcast updated presence to the room
+      io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
     } catch (error) {
       console.error(`Error joining room: ${error}`);
-      // Could emit an error event back to client if needed
     }
   });
 
@@ -35,7 +43,8 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
     if (!roomId) return;
 
     socket.leave(roomId);
-    socket.to(roomId).emit('user-left', { userId }); // Optional
+    PresenceManager.removeParticipant(roomId, socket.id);
+    io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
   });
 
   socket.on('code-change', (payload: { roomId: string; code: string }) => {
@@ -49,11 +58,39 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
     console.log(`Server broadcasting code:update to room ${roomId}`);
   });
 
+  socket.on('cursor:update', (payload: { roomId: string; cursor: any }) => {
+    const { roomId, cursor } = payload;
+    if (!roomId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, { cursor });
+    socket.to(roomId).emit('cursor:update', { socketId: socket.id, cursor });
+  });
+
+  socket.on('selection:update', (payload: { roomId: string; selection: any }) => {
+    const { roomId, selection } = payload;
+    if (!roomId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, { selection });
+    socket.to(roomId).emit('selection:update', { socketId: socket.id, selection });
+  });
+
+  socket.on('typing:start', (payload: { roomId: string }) => {
+    const { roomId } = payload;
+    if (!roomId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, { typing: true, idle: false });
+    socket.to(roomId).emit('typing:update', { socketId: socket.id, typing: true });
+  });
+
+  socket.on('typing:stop', (payload: { roomId: string }) => {
+    const { roomId } = payload;
+    if (!roomId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, { typing: false });
+    socket.to(roomId).emit('typing:update', { socketId: socket.id, typing: false });
+  });
+
   socket.on('disconnecting', () => {
-    // Optionally notify rooms the user is leaving
     for (const room of socket.rooms) {
       if (room !== socket.id) {
-        socket.to(room).emit('user-left', { userId });
+        PresenceManager.removeParticipant(room, socket.id);
+        io.to(room).emit('presence:update', PresenceManager.getRoomParticipants(room));
       }
     }
   });

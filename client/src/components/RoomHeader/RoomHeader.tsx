@@ -38,13 +38,13 @@ export function RoomHeader({
 
   return (
     <header className="flex flex-shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900 p-4 shadow-sm z-10">
-      <div className="flex items-center space-x-4">
-        <Link to="/dashboard" className="rounded p-1 hover:bg-gray-800 transition">
+      <div className="flex items-center space-x-4 flex-1 min-w-0 pr-4">
+        <Link to="/dashboard" className="rounded p-1 hover:bg-gray-800 transition flex-shrink-0">
           <ArrowLeft className="h-5 w-5 text-gray-400" />
         </Link>
-        <div className="flex items-center space-x-2">
-          <Code2 className="h-5 w-5 text-blue-500" />
-          <h1 className="font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
+        <div className="flex items-center space-x-2 min-w-0">
+          <Code2 className="h-5 w-5 text-blue-500 flex-shrink-0" />
+          <h1 className="font-semibold text-white truncate" title={roomName}>
             {roomName}
           </h1>
         </div>
