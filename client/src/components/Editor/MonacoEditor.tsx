@@ -4,9 +4,10 @@ interface MonacoEditorProps {
   language: string;
   value: string;
   onChange: (value: string | undefined) => void;
+  onMount?: (editor: any, monaco: any) => void;
 }
 
-export function MonacoEditor({ language, value, onChange }: MonacoEditorProps) {
+export function MonacoEditor({ language, value, onChange, onMount }: MonacoEditorProps) {
   return (
     <div className="h-full w-full">
       <Editor
@@ -15,6 +16,7 @@ export function MonacoEditor({ language, value, onChange }: MonacoEditorProps) {
         theme="vs-dark"
         value={value}
         onChange={onChange}
+        onMount={onMount}
         options={{
           minimap: { enabled: true },
           wordWrap: 'on',

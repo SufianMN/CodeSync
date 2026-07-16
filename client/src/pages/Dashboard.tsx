@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getRooms, deleteRoom, updateRoom, Room } from '../api/rooms';
 import { CreateRoomModal } from '../components/CreateRoomModal';
-import { Trash2, Edit2, Code2, Plus } from 'lucide-react';
+import { JoinRoomModal } from '../components/JoinRoomModal';
+import { Trash2, Edit2, Code2, Plus, LogIn } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -11,6 +13,7 @@ export function Dashboard() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
@@ -39,7 +42,7 @@ export function Dashboard() {
       await fetchRooms();
     } catch (error: any) {
       console.error('Failed to delete room', error);
-      alert(error.response?.data?.error || 'Failed to delete room');
+      toast.error(error.response?.data?.error || 'Failed to delete room');
     }
   };
 
@@ -60,7 +63,7 @@ export function Dashboard() {
       await fetchRooms();
     } catch (error: any) {
       console.error('Failed to rename room', error);
-      alert(error.response?.data?.error || 'Failed to rename room');
+      toast.error(error.response?.data?.error || 'Failed to rename room');
     } finally {
       setEditingRoomId(null);
     }
@@ -96,13 +99,22 @@ export function Dashboard() {
       <main className="mx-auto w-full max-w-5xl flex-1 p-6 sm:p-8">
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-2xl font-semibold">Your Rooms</h2>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center space-x-2 rounded bg-blue-600 px-4 py-2 font-medium hover:bg-blue-700 transition"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Create Room</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsJoinModalOpen(true)}
+              className="flex items-center space-x-2 rounded bg-gray-800 px-4 py-2 font-medium hover:bg-gray-700 transition"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>Join Room</span>
+            </button>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center space-x-2 rounded bg-blue-600 px-4 py-2 font-medium hover:bg-blue-700 transition"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create Room</span>
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -169,25 +181,29 @@ export function Dashboard() {
                     Open Room
                   </button>
                   <div className="flex items-center space-x-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setEditName(room.name);
-                        setEditingRoomId(room.id);
-                      }}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white"
-                      title="Rename"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(room.id, e)}
-                      className="rounded p-1.5 text-gray-400 hover:bg-red-500/10 hover:text-red-500"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {room.ownerId === user?.id && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditName(room.name);
+                            setEditingRoomId(room.id);
+                          }}
+                          className="rounded p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white"
+                          title="Rename"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(room.id, e)}
+                          className="rounded p-1.5 text-gray-400 hover:bg-red-500/10 hover:text-red-500"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -201,6 +217,8 @@ export function Dashboard() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchRooms}
       />
+
+      <JoinRoomModal isOpen={isJoinModalOpen} onClose={() => setIsJoinModalOpen(false)} />
     </div>
   );
 }

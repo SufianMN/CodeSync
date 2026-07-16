@@ -41,7 +41,7 @@ export class RoomService {
 
   static async getUserRooms(userId: string) {
     const rooms = await prisma.room.findMany({
-      where: { ownerId: userId },
+      where: { members: { some: { userId } } },
       orderBy: { createdAt: 'desc' },
       include: { files: { take: 1 } },
     });
@@ -49,6 +49,7 @@ export class RoomService {
     return rooms.map((room) => ({
       id: room.id,
       name: room.name,
+      ownerId: room.ownerId,
       language: room.files[0]?.language || 'cpp',
       createdAt: room.createdAt,
     }));
@@ -64,15 +65,19 @@ export class RoomService {
       throw Object.assign(new Error('Room not found'), { statusCode: 404 });
     }
 
-    if (room.ownerId !== userId) {
-      throw Object.assign(new Error('Forbidden'), { statusCode: 403 });
-    }
+    // Auto-join logic: add user as member if not already
+    await prisma.roomMember.upsert({
+      where: { roomId_userId: { roomId, userId } },
+      update: {},
+      create: { roomId, userId },
+    });
 
     const primaryFile = room.files[0];
 
     return {
       id: room.id,
       name: room.name,
+      ownerId: room.ownerId,
       language: primaryFile?.language || 'cpp',
       code: primaryFile?.content || '',
       createdAt: room.createdAt,
@@ -145,9 +150,12 @@ export class RoomService {
       throw Object.assign(new Error('Room not found'), { statusCode: 404 });
     }
 
-    if (room.ownerId !== userId) {
-      throw Object.assign(new Error('Forbidden'), { statusCode: 403 });
-    }
+    // Auto-join logic
+    await prisma.roomMember.upsert({
+      where: { roomId_userId: { roomId, userId } },
+      update: {},
+      create: { roomId, userId },
+    });
 
     const primaryFile = room.files[0];
     if (!primaryFile) {
@@ -174,8 +182,11 @@ export class RoomService {
       throw Object.assign(new Error('Room not found'), { statusCode: 404 });
     }
 
-    if (room.ownerId !== userId) {
-      throw Object.assign(new Error('Forbidden'), { statusCode: 403 });
+    const member = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId } },
+    });
+    if (!member) {
+      throw Object.assign(new Error('Forbidden: Not a member'), { statusCode: 403 });
     }
 
     const primaryFile = room.files[0];

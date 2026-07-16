@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { updateRoomCode } from '../api/rooms';
+import toast from 'react-hot-toast';
 
 export type SaveState = 'Saved' | 'Saving...' | 'Unsaved Changes' | 'Failed to save';
 
 export function useAutosave(roomId: string) {
   const [saveState, setSaveState] = useState<SaveState>('Saved');
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestData = useRef<{ code: string; language: string } | null>(null);
 
   const saveToBackend = useCallback(
@@ -17,6 +18,7 @@ export function useAutosave(roomId: string) {
       } catch (error) {
         console.error('Autosave failed', error);
         setSaveState('Failed to save');
+        toast.error('Failed to save changes');
       }
     },
     [roomId],

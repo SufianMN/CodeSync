@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getRoomById, getRoomCode, Room } from '../api/rooms';
 import { useAutosave } from '../hooks/useAutosave';
+import { useCollaboration } from '../hooks/useCollaboration';
 import { RoomHeader } from '../components/RoomHeader/RoomHeader';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 
@@ -17,6 +18,33 @@ export function RoomDetail() {
 
   // Track initialization to avoid saving on first render
   const isInitialized = useRef(false);
+  const isRemoteUpdate = useRef(false);
+  const editorRef = useRef<any>(null);
+
+  const handleEditorMount = (editor: any) => {
+    editorRef.current = editor;
+  };
+
+  const { status: connectionStatus, broadcastChange } = useCollaboration(
+    id || '',
+    (newCode) => {
+      if (editorRef.current && editorRef.current.getValue() !== newCode) {
+        isRemoteUpdate.current = true;
+        const position = editorRef.current.getPosition();
+        editorRef.current.setValue(newCode);
+        editorRef.current.setPosition(position);
+      }
+      setCode(newCode);
+    },
+    (newCode, newLanguage) => {
+      if (editorRef.current && editorRef.current.getValue() !== newCode) {
+        isRemoteUpdate.current = true;
+        editorRef.current.setValue(newCode);
+      }
+      setCode(newCode);
+      setLanguage(newLanguage);
+    },
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -41,9 +69,16 @@ export function RoomDetail() {
 
   const handleEditorChange = (value: string | undefined) => {
     const newCode = value || '';
+
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
+
     setCode(newCode);
     if (isInitialized.current) {
       onEdit(newCode, language);
+      broadcastChange(newCode);
     }
   };
 
@@ -81,10 +116,16 @@ export function RoomDetail() {
         language={language}
         onLanguageChange={handleLanguageChange}
         saveState={saveState}
+        connectionStatus={connectionStatus}
       />
       <main className="flex-1 relative">
         <div className="absolute inset-0 hidden md:block">
-          <MonacoEditor language={language} value={code} onChange={handleEditorChange} />
+          <MonacoEditor
+            language={language}
+            value={code}
+            onChange={handleEditorChange}
+            onMount={handleEditorMount}
+          />
         </div>
         <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
           <p className="text-gray-400">Editing is best experienced on desktop.</p>

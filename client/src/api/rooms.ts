@@ -3,6 +3,7 @@ import { apiClient } from './axios';
 export interface Room {
   id: string;
   name: string;
+  ownerId: string;
   language: string;
   code?: string;
   createdAt: string;

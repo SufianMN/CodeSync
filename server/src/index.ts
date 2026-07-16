@@ -6,6 +6,7 @@ import cookie from '@fastify/cookie';
 import { prisma } from './utils/prisma';
 import authRoutes from './routes/auth.routes';
 import roomRoutes from './routes/room.routes';
+import { initializeSocket } from './socket/socket';
 
 const server = Fastify({
   logger: {
@@ -64,6 +65,10 @@ const start = async () => {
           .send({ success: false, error: { message: 'Database disconnected', issues: [] } });
       }
     });
+
+    // Initialize Socket.IO attached to Fastify's raw HTTP server
+    await server.ready();
+    initializeSocket(server);
 
     await server.listen({ port: 3000, host: '0.0.0.0' });
   } catch (err) {
