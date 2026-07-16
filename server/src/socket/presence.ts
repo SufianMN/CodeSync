@@ -69,6 +69,16 @@ export const PresenceManager = {
     }
     const room = presenceStore.get(roomId)!;
 
+    // Remove any existing participant with the same userId to prevent duplicates
+    for (const [existingSocketId, existingParticipant] of room.entries()) {
+      if (existingParticipant.userId === userId) {
+        room.delete(existingSocketId);
+        console.log(
+          `[Presence] Removed stale socket ${existingSocketId} for user ${userId} in room ${roomId}`,
+        );
+      }
+    }
+
     const participant: Participant = {
       socketId,
       userId,
@@ -82,15 +92,24 @@ export const PresenceManager = {
     };
 
     room.set(socketId, participant);
+    console.log(
+      `[Presence] Joined room ${roomId} | Socket: ${socketId} | User: ${userId} | Count: ${room.size}`,
+    );
     return participant;
   },
 
   removeParticipant(roomId: string, socketId: string) {
     const room = presenceStore.get(roomId);
     if (room) {
-      room.delete(socketId);
-      if (room.size === 0) {
-        presenceStore.delete(roomId);
+      const participant = room.get(socketId);
+      if (participant) {
+        room.delete(socketId);
+        console.log(
+          `[Presence] Left room ${roomId} | Socket: ${socketId} | User: ${participant.userId} | Count: ${room.size}`,
+        );
+        if (room.size === 0) {
+          presenceStore.delete(roomId);
+        }
       }
     }
   },
