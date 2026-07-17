@@ -168,13 +168,34 @@ export function RoomDetail() {
     setExecResult(null);
 
     try {
+      const supportedLanguages = ['cpp', 'python', 'java', 'javascript'];
+      if (!supportedLanguages.includes(language.toLowerCase())) {
+        setExecError(
+          `Execution for '${language}' is not supported yet.\nSupported languages are: ${supportedLanguages.join(', ')}`,
+        );
+        setIsExecuting(false);
+        return;
+      }
+
       await saveToBackend(activeFileId, code, language);
-      const result = await executeCode({ language, code, stdin });
+      const result = await executeCode({ language: language.toLowerCase(), code, stdin });
       setExecResult(result);
     } catch (err: any) {
       let errorMsg = 'Execution failed';
       if (err.response?.data?.details) {
-        errorMsg = JSON.stringify(err.response.data.details, null, 2);
+        try {
+          const details =
+            typeof err.response.data.details === 'string'
+              ? JSON.parse(err.response.data.details)
+              : err.response.data.details;
+          if (Array.isArray(details) && details[0]?.message) {
+            errorMsg = details.map((d: any) => d.message).join('\n');
+          } else {
+            errorMsg = JSON.stringify(details, null, 2);
+          }
+        } catch {
+          errorMsg = JSON.stringify(err.response.data.details, null, 2);
+        }
       } else if (err.response?.data?.error) {
         errorMsg = err.response.data.error;
       } else if (err.message) {

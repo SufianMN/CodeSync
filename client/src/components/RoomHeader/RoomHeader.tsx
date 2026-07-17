@@ -24,9 +24,6 @@ const LANGUAGES = [
   { value: 'java', label: 'Java' },
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'go', label: 'Go' },
-  { value: 'rust', label: 'Rust' },
 ];
 
 export function RoomHeader({

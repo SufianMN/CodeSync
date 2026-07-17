@@ -32,7 +32,7 @@ const LANGUAGE_CONFIG = {
     runCommand: 'python3 main.py',
   },
   java: {
-    image: 'openjdk:17-slim',
+    image: 'eclipse-temurin:17-jdk-jammy',
     fileName: 'Main.java',
     runCommand: 'javac Main.java && java Main',
   },
