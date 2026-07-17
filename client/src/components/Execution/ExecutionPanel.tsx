@@ -12,6 +12,9 @@ interface ExecutionPanelProps {
   error: string | null;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  height: number;
+  isDragging: boolean;
+  onResizeStart: (e: React.PointerEvent) => void;
 }
 
 export function ExecutionPanel({
@@ -22,13 +25,11 @@ export function ExecutionPanel({
   error,
   isOpen,
   setIsOpen,
+  height,
+  isDragging,
+  onResizeStart,
 }: ExecutionPanelProps) {
   const [activeTab, setActiveTab] = useState<'input' | 'output'>('input');
-  const [height, setHeight] = useState(() => {
-    const saved = localStorage.getItem('executionPanelHeight');
-    return saved ? parseInt(saved, 10) : 300;
-  });
-  const [isDragging, setIsDragging] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,47 +38,6 @@ export function ExecutionPanel({
       setIsOpen(true);
     }
   }, [isLoading, setIsOpen]);
-
-  useEffect(() => {
-    localStorage.setItem('executionPanelHeight', height.toString());
-  }, [height]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: globalThis.MouseEvent) => {
-      if (!isDragging) return;
-
-      const windowHeight = window.innerHeight;
-      const newHeight = windowHeight - e.clientY;
-
-      // Min height 150px, Max height 60% of window
-      if (newHeight >= 150 && newHeight <= windowHeight * 0.6) {
-        setHeight(newHeight);
-      } else if (newHeight < 150) {
-        setHeight(150);
-      } else if (newHeight > windowHeight * 0.6) {
-        setHeight(windowHeight * 0.6);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-    } else {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
 
   if (!isOpen) {
     return (
@@ -99,8 +59,11 @@ export function ExecutionPanel({
     >
       {/* Drag handle */}
       <div
-        className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500/50 z-20"
-        onMouseDown={() => setIsDragging(true)}
+        className={twMerge(
+          'absolute top-0 left-0 right-0 h-1 cursor-row-resize z-50 transition-colors duration-150 -translate-y-1/2',
+          isDragging ? 'bg-blue-500' : 'hover:bg-blue-400/50',
+        )}
+        onPointerDown={onResizeStart}
       />
 
       {/* Overlay to prevent editor from stealing mouse events during drag */}

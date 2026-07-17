@@ -12,6 +12,10 @@ import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
 import { executeCode, ExecuteResponse } from '../api/execute';
 import { throttle, debounce } from '../utils/throttle';
 import { socket } from '../socket/socket';
+import { useWorkspace } from '../hooks/useWorkspace';
+import { useEditorSettings } from '../hooks/useEditorSettings';
+import { useShortcuts } from '../hooks/useShortcuts';
+import { twMerge } from 'tailwind-merge';
 
 export function RoomDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +42,26 @@ export function RoomDetail() {
   const typingRef = useRef(false);
 
   const { participants } = usePresence(id || '');
+
+  // Workspace layout and settings
+  const { sidebar, terminal, chat, isDraggingAny, resetLayout } = useWorkspace();
+  const { settings, updateSetting, resetSettings } = useEditorSettings();
+
+  const handleResetLayout = () => {
+    resetLayout();
+    resetSettings();
+  };
+
+  useShortcuts({
+    onRunCode: () => handleRun(),
+    onSave: () => saveToBackend(code, language),
+    onToggleSidebar: () => sidebar.resetSize(sidebar.size < 100 ? 320 : 0),
+    onToggleTerminal: () => setIsExecutionPanelOpen(!isExecutionPanelOpen),
+    onCopyLink: () => navigator.clipboard.writeText(window.location.href),
+    onIncreaseFontSize: () => updateSetting('fontSize', Math.min(24, settings.fontSize + 1)),
+    onDecreaseFontSize: () => updateSetting('fontSize', Math.max(10, settings.fontSize - 1)),
+    onResetFontSize: () => updateSetting('fontSize', 14),
+  });
 
   const handleRun = async () => {
     if (isExecuting) return;
@@ -314,8 +338,11 @@ export function RoomDetail() {
         connectionStatus={connectionStatus}
         onRun={handleRun}
         isRunning={isExecuting}
+        editorSettings={settings}
+        updateSetting={updateSetting}
+        resetLayout={handleResetLayout}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <main className="flex-1 flex flex-col relative min-w-0">
           <div className="flex-1 relative hidden md:block">
             <MonacoEditor
@@ -323,7 +350,17 @@ export function RoomDetail() {
               value={code}
               onChange={handleEditorChange}
               onMount={handleEditorMount}
+              theme={settings.theme}
+              customOptions={{
+                minimap: { enabled: settings.minimap },
+                wordWrap: settings.wordWrap ? 'on' : 'off',
+                lineNumbers: settings.lineNumbers ? 'on' : 'off',
+                renderLineHighlight: settings.highlightActiveLine ? 'all' : 'none',
+                fontSize: settings.fontSize,
+              }}
             />
+            {/* Global overlay while dragging to protect iframe/editor */}
+            {isDraggingAny && <div className="absolute inset-0 z-40 bg-transparent" />}
           </div>
 
           <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
@@ -339,13 +376,47 @@ export function RoomDetail() {
               error={execError}
               isOpen={isExecutionPanelOpen}
               setIsOpen={setIsExecutionPanelOpen}
+              height={terminal.size}
+              isDragging={terminal.isDragging}
+              onResizeStart={terminal.handlePointerDown}
             />
           </div>
         </main>
 
-        <div className="w-80 flex flex-col flex-shrink-0 border-l border-gray-800 bg-gray-900 hidden lg:flex">
-          <ParticipantPanel participants={participants} />
-          <ChatPanel roomId={id || ''} participants={participants} />
+        {/* Vertical divider for Sidebar */}
+        <div
+          className={twMerge(
+            'w-1 cursor-col-resize z-50 transition-colors duration-150 flex-shrink-0 hidden lg:block',
+            sidebar.isDragging ? 'bg-blue-500' : 'hover:bg-blue-400/50 bg-gray-800',
+          )}
+          onPointerDown={sidebar.handlePointerDown}
+        />
+
+        {/* Right Sidebar */}
+        <div
+          className="flex flex-col flex-shrink-0 bg-gray-900 hidden lg:flex overflow-hidden relative"
+          style={{ width: `${sidebar.size}px` }}
+        >
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0 relative">
+            <ParticipantPanel participants={participants} />
+          </div>
+
+          {/* Horizontal divider for Chat */}
+          <div
+            className={twMerge(
+              'h-1 cursor-row-resize z-50 transition-colors duration-150 flex-shrink-0',
+              chat.isDragging ? 'bg-blue-500' : 'hover:bg-blue-400/50 bg-gray-800',
+            )}
+            onPointerDown={chat.handlePointerDown}
+          />
+
+          <div
+            style={{ height: `${chat.size}px` }}
+            className="flex flex-col flex-shrink-0 overflow-hidden relative"
+          >
+            <ChatPanel roomId={id || ''} participants={participants} />
+            {chat.isDragging && <div className="absolute inset-0 z-40 bg-transparent" />}
+          </div>
         </div>
       </div>
     </div>
