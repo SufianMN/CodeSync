@@ -83,6 +83,7 @@ export function useResizable({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     // Disable body selection and set cursor
     document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
@@ -91,6 +92,7 @@ export function useResizable({
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };

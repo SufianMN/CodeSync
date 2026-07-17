@@ -13,8 +13,6 @@ interface ExecutionPanelProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   height: number;
-  isDragging: boolean;
-  onResizeStart: (e: React.PointerEvent) => void;
 }
 
 export function ExecutionPanel({
@@ -26,8 +24,6 @@ export function ExecutionPanel({
   isOpen,
   setIsOpen,
   height,
-  isDragging,
-  onResizeStart,
 }: ExecutionPanelProps) {
   const [activeTab, setActiveTab] = useState<'input' | 'output'>('input');
   const panelRef = useRef<HTMLDivElement>(null);
@@ -54,21 +50,9 @@ export function ExecutionPanel({
   return (
     <div
       ref={panelRef}
-      className="flex flex-col bg-[#1e1e1e] border-t border-gray-800 relative z-10 flex-shrink-0"
+      className="flex flex-col bg-[#1e1e1e] relative z-10 flex-shrink-0"
       style={{ height: `${height}px` }}
     >
-      {/* Drag handle */}
-      <div
-        className={twMerge(
-          'absolute top-0 left-0 right-0 h-1 cursor-row-resize z-50 transition-colors duration-150 -translate-y-1/2',
-          isDragging ? 'bg-blue-500' : 'hover:bg-blue-400/50',
-        )}
-        onPointerDown={onResizeStart}
-      />
-
-      {/* Overlay to prevent editor from stealing mouse events during drag */}
-      {isDragging && <div className="fixed inset-0 z-50 cursor-row-resize" />}
-
       {/* Tabs Header */}
       <div className="flex items-center justify-between bg-[#1e1e1e] border-b border-gray-800 px-2 pt-2">
         <div className="flex space-x-1">

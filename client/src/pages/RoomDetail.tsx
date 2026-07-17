@@ -344,7 +344,7 @@ export function RoomDetail() {
       />
       <div className="flex flex-1 overflow-hidden relative">
         <main className="flex-1 flex flex-col relative min-w-0">
-          <div className="flex-1 relative hidden md:block">
+          <div className="flex-1 relative hidden md:block min-h-0">
             <MonacoEditor
               language={language}
               value={code}
@@ -367,7 +367,19 @@ export function RoomDetail() {
             <p className="text-gray-400">Editing is best experienced on desktop.</p>
           </div>
 
-          <div className="flex flex-col flex-shrink-0 z-10 hidden md:flex">
+          <div className="flex flex-col flex-shrink-0 z-10 hidden md:flex min-h-0">
+            {/* Horizontal divider for Terminal */}
+            {isExecutionPanelOpen && (
+              <div
+                className={twMerge(
+                  'h-1 cursor-row-resize z-50 transition-colors duration-150 flex-shrink-0 relative',
+                  terminal.isDragging
+                    ? 'bg-blue-500'
+                    : 'hover:bg-blue-400/50 bg-gray-800 border-t border-gray-800',
+                )}
+                onPointerDown={terminal.handlePointerDown}
+              />
+            )}
             <ExecutionPanel
               stdin={stdin}
               setStdin={setStdin}
@@ -377,8 +389,6 @@ export function RoomDetail() {
               isOpen={isExecutionPanelOpen}
               setIsOpen={setIsExecutionPanelOpen}
               height={terminal.size}
-              isDragging={terminal.isDragging}
-              onResizeStart={terminal.handlePointerDown}
             />
           </div>
         </main>
