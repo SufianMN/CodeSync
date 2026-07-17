@@ -7,6 +7,7 @@ import { usePresence } from '../hooks/usePresence';
 import { RoomHeader } from '../components/RoomHeader/RoomHeader';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { ParticipantPanel } from '../components/ParticipantPanel/ParticipantPanel';
+import { ChatPanel } from '../components/Chat/ChatPanel';
 import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
 import { executeCode, ExecuteResponse } from '../api/execute';
 import { throttle, debounce } from '../utils/throttle';
@@ -315,8 +316,6 @@ export function RoomDetail() {
         isRunning={isExecuting}
       />
       <div className="flex flex-1 overflow-hidden">
-        <ParticipantPanel participants={participants} />
-
         <main className="flex-1 flex flex-col relative min-w-0">
           <div className="flex-1 relative hidden md:block">
             <MonacoEditor
@@ -343,6 +342,11 @@ export function RoomDetail() {
             />
           </div>
         </main>
+
+        <div className="w-80 flex flex-col flex-shrink-0 border-l border-gray-800 bg-gray-900 hidden lg:flex">
+          <ParticipantPanel participants={participants} />
+          <ChatPanel roomId={id || ''} participants={participants} />
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { RoomController } from '../controllers/room.controller';
+import { ChatController } from '../controllers/chat.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 export default async function roomRoutes(server: FastifyInstance) {
@@ -13,4 +14,6 @@ export default async function roomRoutes(server: FastifyInstance) {
 
   server.get('/:id/code', RoomController.getCode);
   server.put('/:id/code', RoomController.updateCode);
+
+  server.get('/:roomId/messages', ChatController.getRoomMessages);
 }

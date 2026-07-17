@@ -3,6 +3,8 @@ import { AuthenticatedSocket } from './auth';
 import { RoomService } from '../services/room.service';
 import { PresenceManager } from './presence';
 import { prisma } from '../utils/prisma';
+import { ChatService } from '../services/chat.service';
+import { sendChatMessageSchema } from '../schemas/chat.schema';
 
 export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) => {
   const userId = socket.user?.userId;
@@ -33,6 +35,11 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
 
       // Broadcast updated presence to the room
       io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
+
+      // Emit system message
+      if (user) {
+        socket.to(roomId).emit('system:message', { type: 'join', username: user.name });
+      }
     } catch (error) {
       console.error(`Error joining room: ${error}`);
     }
@@ -41,6 +48,11 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
   socket.on('leave-room', (payload: { roomId: string }) => {
     const { roomId } = payload;
     if (!roomId) return;
+
+    const participant = PresenceManager.getParticipant(roomId, socket.id);
+    if (participant) {
+      socket.to(roomId).emit('system:message', { type: 'leave', username: participant.username });
+    }
 
     socket.leave(roomId);
     PresenceManager.removeParticipant(roomId, socket.id);
@@ -86,9 +98,27 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
     io.to(roomId).emit('typing:update', { socketId: socket.id, typing: false });
   });
 
+  socket.on('chat:send', async (payload: { roomId: string; content: string }) => {
+    try {
+      const { roomId, content } = payload;
+      if (!roomId || !userId) return;
+
+      const validated = sendChatMessageSchema.parse({ content });
+      const message = await ChatService.sendMessage(roomId, userId, validated);
+
+      io.to(roomId).emit('chat:new', message);
+    } catch (error) {
+      console.error(`Error sending chat message: ${error}`);
+    }
+  });
+
   socket.on('disconnecting', () => {
     for (const room of socket.rooms) {
       if (room !== socket.id) {
+        const participant = PresenceManager.getParticipant(room, socket.id);
+        if (participant) {
+          socket.to(room).emit('system:message', { type: 'leave', username: participant.username });
+        }
         PresenceManager.removeParticipant(room, socket.id);
         io.to(room).emit('presence:update', PresenceManager.getRoomParticipants(room));
       }
