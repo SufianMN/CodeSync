@@ -29,7 +29,7 @@ model Room {
 
   owner    User         @relation("RoomOwner", fields: [ownerId], references: [id])
   members  RoomMember[]
-  files    RoomFile[]
+  workspaceNodes WorkspaceNode[]
   messages Message[]
 
   @@index([ownerId])
@@ -49,16 +49,21 @@ model RoomMember {
   @@index([userId])
 }
 
-model RoomFile {
-  id        String   @id @default(uuid())
-  roomId    String
-  filename  String
-  language  String
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model WorkspaceNode {
+  id          String   @id @default(uuid())
+  roomId      String
+  parentId    String?
+  type        String   // "FILE" | "FOLDER"
+  name        String
+  language    String?
+  content     String?  @db.Text
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room        Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  parent      WorkspaceNode?  @relation("ParentChild", fields: [parentId], references: [id], onDelete: Cascade)
+  children    WorkspaceNode[] @relation("ParentChild")
 
   @@index([roomId])
 }

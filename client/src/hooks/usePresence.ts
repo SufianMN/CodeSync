@@ -24,6 +24,7 @@ export interface Participant {
   lastSeen?: number;
   cursor: CursorPos | null;
   selection: SelectionRange | null;
+  activeFileId: string | null;
 }
 
 export function usePresence(roomId: string) {
@@ -63,49 +64,92 @@ export function usePresence(roomId: string) {
       );
     };
 
-    const handleTypingUpdate = (payload: { socketId: string; typing: boolean }) => {
+    const handleTypingUpdate = (payload: {
+      fileId: string;
+      socketId: string;
+      isTyping: boolean;
+    }) => {
       setParticipants((prev) =>
         prev.map((p) =>
           p.socketId === payload.socketId
-            ? { ...p, typing: payload.typing, idle: false, lastSeen: Date.now() }
+            ? {
+                ...p,
+                typing: payload.isTyping,
+                idle: false,
+                lastSeen: Date.now(),
+                activeFileId: payload.fileId,
+              }
             : p,
         ),
       );
     };
 
-    const handleCursorUpdate = (payload: { socketId: string; cursor: CursorPos | null }) => {
+    const handleCursorUpdate = (payload: {
+      fileId: string;
+      socketId: string;
+      cursor: CursorPos | null;
+    }) => {
       setParticipants((prev) =>
         prev.map((p) =>
           p.socketId === payload.socketId
-            ? { ...p, cursor: payload.cursor, idle: false, lastSeen: Date.now() }
+            ? {
+                ...p,
+                cursor: payload.cursor,
+                idle: false,
+                lastSeen: Date.now(),
+                activeFileId: payload.fileId,
+              }
             : p,
         ),
       );
     };
 
     const handleSelectionUpdate = (payload: {
+      fileId: string;
       socketId: string;
       selection: SelectionRange | null;
     }) => {
       setParticipants((prev) =>
         prev.map((p) =>
           p.socketId === payload.socketId
-            ? { ...p, selection: payload.selection, idle: false, lastSeen: Date.now() }
+            ? {
+                ...p,
+                selection: payload.selection,
+                idle: false,
+                lastSeen: Date.now(),
+                activeFileId: payload.fileId,
+              }
             : p,
         ),
       );
     };
 
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const onConnect = () => {
+      socket.emit('join-room', { roomId });
+    };
+
+    if (socket.connected) {
+      onConnect();
+    }
+
+    socket.on('connect', onConnect);
     socket.on('presence:update', handlePresenceUpdate);
-    socket.on('typing:update', handleTypingUpdate);
-    socket.on('cursor:update', handleCursorUpdate);
-    socket.on('selection:update', handleSelectionUpdate);
+    socket.on('file:typing', handleTypingUpdate);
+    socket.on('file:cursor', handleCursorUpdate);
+    socket.on('file:selection', handleSelectionUpdate);
 
     return () => {
+      socket.off('connect', onConnect);
       socket.off('presence:update', handlePresenceUpdate);
-      socket.off('typing:update', handleTypingUpdate);
-      socket.off('cursor:update', handleCursorUpdate);
-      socket.off('selection:update', handleSelectionUpdate);
+      socket.off('file:typing', handleTypingUpdate);
+      socket.off('file:cursor', handleCursorUpdate);
+      socket.off('file:selection', handleSelectionUpdate);
+
+      socket.emit('leave-room', { roomId });
     };
   }, [roomId]);
 

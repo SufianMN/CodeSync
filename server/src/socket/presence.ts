@@ -22,6 +22,7 @@ export interface Participant {
   lastSeen: number;
   cursor: CursorPos | null;
   selection: SelectionRange | null;
+  activeFileId: string | null;
 }
 
 const COLORS = [
@@ -89,6 +90,7 @@ export const PresenceManager = {
       lastSeen: Date.now(),
       cursor: null,
       selection: null,
+      activeFileId: null,
     };
 
     room.set(socketId, participant);

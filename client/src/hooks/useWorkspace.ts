@@ -1,12 +1,22 @@
 import { useResizable } from './useResizable';
 
 export const WORKSPACE_DEFAULTS = {
+  explorerWidth: 240,
   sidebarWidth: 320,
   terminalHeight: 250,
   chatHeight: 300,
 };
 
 export function useWorkspace() {
+  const explorer = useResizable({
+    direction: 'horizontal',
+    initialSize: WORKSPACE_DEFAULTS.explorerWidth,
+    minSize: 180,
+    maxSize: 500,
+    localStorageKey: 'workspace_explorerWidth',
+    reverse: false, // Pinned to the left
+  });
+
   const sidebar = useResizable({
     direction: 'horizontal',
     initialSize: WORKSPACE_DEFAULTS.sidebarWidth,
@@ -34,15 +44,18 @@ export function useWorkspace() {
     reverse: true, // Pinned to the bottom (below Participants)
   });
 
-  const isDraggingAny = sidebar.isDragging || terminal.isDragging || chat.isDragging;
+  const isDraggingAny =
+    explorer.isDragging || sidebar.isDragging || terminal.isDragging || chat.isDragging;
 
   const resetLayout = () => {
+    explorer.resetSize(WORKSPACE_DEFAULTS.explorerWidth);
     sidebar.resetSize(WORKSPACE_DEFAULTS.sidebarWidth);
     terminal.resetSize(WORKSPACE_DEFAULTS.terminalHeight);
     chat.resetSize(WORKSPACE_DEFAULTS.chatHeight);
   };
 
   return {
+    explorer,
     sidebar,
     terminal,
     chat,

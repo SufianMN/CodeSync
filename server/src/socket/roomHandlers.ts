@@ -24,15 +24,6 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
         PresenceManager.addParticipant(roomId, socket.id, userId, user.name);
       }
 
-      // Fetch the latest code state from the database
-      const roomState = await RoomService.getRoomCode(roomId, userId);
-
-      // Send the state only to the socket that just joined
-      socket.emit('room-state', {
-        code: roomState.code,
-        language: roomState.language,
-      });
-
       // Broadcast updated presence to the room
       io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
 
@@ -59,43 +50,50 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
     io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
   });
 
-  socket.on('code-change', (payload: { roomId: string; code: string }) => {
-    const { roomId, code } = payload;
+  socket.on('file:view', (payload: { roomId: string; fileId: string | null }) => {
+    const { roomId, fileId } = payload;
     if (!roomId) return;
-
-    console.log(`Server received code:update from ${socket.id} for room ${roomId}`);
-
-    // Broadcast the update to everyone else in the room
-    socket.to(roomId).emit('code-update', { code });
-    console.log(`Server broadcasting code:update to room ${roomId}`);
+    PresenceManager.updateParticipant(roomId, socket.id, { activeFileId: fileId, idle: false });
+    io.to(roomId).emit('presence:update', PresenceManager.getRoomParticipants(roomId));
   });
 
-  socket.on('cursor:update', (payload: { roomId: string; cursor: any }) => {
-    const { roomId, cursor } = payload;
-    if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { cursor, idle: false });
-    io.to(roomId).emit('cursor:update', { socketId: socket.id, cursor });
+  socket.on('file:update', (payload: { roomId: string; fileId: string; code: string }) => {
+    const { roomId, fileId, code } = payload;
+    if (!roomId || !fileId) return;
+    socket.to(roomId).emit('file:update', { fileId, socketId: socket.id, code });
   });
 
-  socket.on('selection:update', (payload: { roomId: string; selection: any }) => {
-    const { roomId, selection } = payload;
-    if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { selection, idle: false });
-    io.to(roomId).emit('selection:update', { socketId: socket.id, selection });
+  socket.on('file:cursor', (payload: { roomId: string; fileId: string; cursor: any }) => {
+    const { roomId, fileId, cursor } = payload;
+    if (!roomId || !fileId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, {
+      cursor,
+      activeFileId: fileId,
+      idle: false,
+    });
+    io.to(roomId).emit('file:cursor', { fileId, socketId: socket.id, cursor });
   });
 
-  socket.on('typing:start', (payload: { roomId: string }) => {
-    const { roomId } = payload;
-    if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { typing: true, idle: false });
-    io.to(roomId).emit('typing:update', { socketId: socket.id, typing: true });
+  socket.on('file:selection', (payload: { roomId: string; fileId: string; selection: any }) => {
+    const { roomId, fileId, selection } = payload;
+    if (!roomId || !fileId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, {
+      selection,
+      activeFileId: fileId,
+      idle: false,
+    });
+    io.to(roomId).emit('file:selection', { fileId, socketId: socket.id, selection });
   });
 
-  socket.on('typing:stop', (payload: { roomId: string }) => {
-    const { roomId } = payload;
-    if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { typing: false });
-    io.to(roomId).emit('typing:update', { socketId: socket.id, typing: false });
+  socket.on('file:typing', (payload: { roomId: string; fileId: string; isTyping: boolean }) => {
+    const { roomId, fileId, isTyping } = payload;
+    if (!roomId || !fileId) return;
+    PresenceManager.updateParticipant(roomId, socket.id, {
+      typing: isTyping,
+      activeFileId: fileId,
+      idle: false,
+    });
+    io.to(roomId).emit('file:typing', { fileId, socketId: socket.id, isTyping });
   });
 
   socket.on('chat:send', async (payload: { roomId: string; content: string }) => {

@@ -1,14 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getRoomById, getRoomCode, Room } from '../api/rooms';
+import { getRoomById } from '../api/rooms';
 import { useAutosave } from '../hooks/useAutosave';
-import { useCollaboration } from '../hooks/useCollaboration';
 import { usePresence } from '../hooks/usePresence';
+import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
+import { useFileCollaboration } from '../hooks/useFileCollaboration';
 import { RoomHeader } from '../components/RoomHeader/RoomHeader';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { ParticipantPanel } from '../components/ParticipantPanel/ParticipantPanel';
 import { ChatPanel } from '../components/Chat/ChatPanel';
 import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
+import { Explorer } from '../components/Workspace/Explorer';
+import { EditorTabs } from '../components/Workspace/EditorTabs';
 import { executeCode, ExecuteResponse } from '../api/execute';
 import { throttle, debounce } from '../utils/throttle';
 import { socket } from '../socket/socket';
@@ -19,11 +22,44 @@ import { twMerge } from 'tailwind-merge';
 
 export function RoomDetail() {
   const { id } = useParams<{ id: string }>();
-  const [room, setRoom] = useState<Room | null>(null);
-  const [code, setCode] = useState('');
-  const [language, setLanguage] = useState('cpp');
+  const roomId = id || '';
+  const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Workspace Tree
+  const {
+    nodes,
+    loading: treeLoading,
+    activeFileId,
+    setActiveFileId,
+    openTabs,
+    openFile,
+    closeTab,
+    activeNode,
+    createNode,
+    updateNode,
+    deleteNode,
+  } = useWorkspaceTree(roomId);
+
+  // Editor states
+  const [code, setCode] = useState('');
+  const [language, setLanguage] = useState('txt');
+
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const viewStates = useRef(new Map<string, any>());
+  const isRemoteUpdate = useRef(false);
+
+  // Collaboration
+  const {
+    participants, // All users
+  } = usePresence(roomId);
+
+  const { broadcastCodeChange, broadcastCursor, broadcastSelection, setTypingStatus } =
+    useFileCollaboration(roomId, activeFileId);
+
+  const { saveState, onEdit, saveToBackend } = useAutosave();
 
   // Execution states
   const [stdin, setStdin] = useState('');
@@ -32,21 +68,82 @@ export function RoomDetail() {
   const [execResult, setExecResult] = useState<ExecuteResponse | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
 
-  const { saveState, onEdit, saveToBackend } = useAutosave(id || '');
-
-  const isInitialized = useRef(false);
-  const isRemoteUpdate = useRef(false);
-  const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
-  const decorationsCollectionRef = useRef<any>(null);
-  const typingRef = useRef(false);
-
-  const { participants } = usePresence(id || '');
-
-  // Workspace layout and settings
-  const { sidebar, terminal, chat, isDraggingAny, resetLayout } = useWorkspace();
+  const { explorer, sidebar, terminal, chat, isDraggingAny, resetLayout } = useWorkspace();
   const { settings, updateSetting, resetSettings } = useEditorSettings();
 
+  const [isExplorerOpen, setIsExplorerOpen] = useState(true);
+
+  useEffect(() => {
+    async function loadRoom() {
+      try {
+        setLoading(true);
+        const data = await getRoomById(roomId);
+        setRoom(data);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load room');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadRoom();
+  }, [roomId]);
+
+  // Handle active file switching
+  useEffect(() => {
+    if (activeNode) {
+      if (editorRef.current && code) {
+        // We shouldn't save state here easily unless we know the previous ID.
+        // We rely on closeTab or manual clicks to save state.
+      }
+      setCode(activeNode.content || '');
+      setLanguage(activeNode.language || 'txt');
+
+      // Restore view state if it exists
+      if (editorRef.current && viewStates.current.has(activeNode.id)) {
+        editorRef.current.restoreViewState(viewStates.current.get(activeNode.id));
+      }
+    } else {
+      setCode('');
+      setLanguage('txt');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFileId]); // Deliberately omitted activeNode to avoid code overwrite issues, wait activeFileId triggers it.
+
+  // Socket IO file events listener
+  useEffect(() => {
+    if (!socket.connected || !roomId) return;
+
+    const handleFileUpdate = ({ fileId, code: newCode }: { fileId: string; code: string }) => {
+      // If we are looking at the file, update UI
+      if (fileId === activeFileId) {
+        if (editorRef.current && editorRef.current.getValue() !== newCode) {
+          isRemoteUpdate.current = true;
+          const position = editorRef.current.getPosition();
+          editorRef.current.setValue(newCode);
+          editorRef.current.setPosition(position);
+        }
+        setCode(newCode);
+      } else {
+        // The tree handles content fetching, but actually the node content might be outdated.
+        // For a full system we'd update `nodes` or just refetch. But for now we only care about active file.
+      }
+    };
+
+    const handleRemoteCursor = (_payload: any) => {
+      // Add cursor logic using decorations
+      // We can implement this in the activeParticipants render effect
+    };
+
+    socket.on('file:update', handleFileUpdate);
+    socket.on('file:cursor', handleRemoteCursor);
+
+    return () => {
+      socket.off('file:update', handleFileUpdate);
+      socket.off('file:cursor', handleRemoteCursor);
+    };
+  }, [roomId, activeFileId]);
+
+  // Handle Ctrl+S and layout shortcuts
   const handleResetLayout = () => {
     resetLayout();
     resetSettings();
@@ -54,7 +151,7 @@ export function RoomDetail() {
 
   useShortcuts({
     onRunCode: () => handleRun(),
-    onSave: () => saveToBackend(code, language),
+    onSave: () => activeFileId && saveToBackend(activeFileId, code, language),
     onToggleSidebar: () => sidebar.resetSize(sidebar.size < 100 ? 320 : 0),
     onToggleTerminal: () => setIsExecutionPanelOpen(!isExecutionPanelOpen),
     onCopyLink: () => navigator.clipboard.writeText(window.location.href),
@@ -64,222 +161,57 @@ export function RoomDetail() {
   });
 
   const handleRun = async () => {
-    if (isExecuting) return;
+    if (isExecuting || !activeFileId) return;
     setIsExecuting(true);
     setIsExecutionPanelOpen(true);
     setExecError(null);
     setExecResult(null);
 
     try {
-      // Ensure the latest code is saved
-      await saveToBackend(code, language);
-
-      const result = await executeCode({
-        language,
-        code,
-        stdin,
-      });
-
+      await saveToBackend(activeFileId, code, language);
+      const result = await executeCode({ language, code, stdin });
       setExecResult(result);
     } catch (err: any) {
       let errorMsg = 'Execution failed';
-
-      if (err.response?.data) {
-        const data = err.response.data;
-        if (data.details) {
-          if (Array.isArray(data.details)) {
-            // Zod error array
-            errorMsg = data.details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
-          } else if (typeof data.details === 'object') {
-            // Other object
-            errorMsg = JSON.stringify(data.details, null, 2);
-          } else {
-            // String or primitive
-            errorMsg = String(data.details);
-          }
-        } else if (data.error) {
-          errorMsg = data.error;
-        }
+      if (err.response?.data?.details) {
+        errorMsg = JSON.stringify(err.response.data.details, null, 2);
+      } else if (err.response?.data?.error) {
+        errorMsg = err.response.data.error;
       } else if (err.message) {
         errorMsg = err.message;
       }
-
       setExecError(errorMsg);
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const handleTypingStop = useCallback(
-    debounce(() => {
-      if (socket.connected && id) {
-        socket.emit('typing:stop', { roomId: id });
-        typingRef.current = false;
-      }
-    }, 2000),
-    [id],
-  );
-
   const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Handle Ctrl+Enter
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      handleRun();
-    });
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => handleRun());
 
     editor.onDidChangeCursorPosition(
       throttle((e: any) => {
-        if (socket.connected && id) {
-          socket.emit('cursor:update', {
-            roomId: id,
-            cursor: { line: e.position.lineNumber, column: e.position.column },
-          });
-        }
+        broadcastCursor({ line: e.position.lineNumber, column: e.position.column });
       }, 50),
     );
 
     editor.onDidChangeCursorSelection(
       throttle((e: any) => {
-        if (socket.connected && id) {
-          socket.emit('selection:update', {
-            roomId: id,
-            selection: {
-              startLineNumber: e.selection.startLineNumber,
-              startColumn: e.selection.startColumn,
-              endLineNumber: e.selection.endLineNumber,
-              endColumn: e.selection.endColumn,
-            },
-          });
-        }
+        broadcastSelection({
+          startLineNumber: e.selection.startLineNumber,
+          startColumn: e.selection.startColumn,
+          endLineNumber: e.selection.endLineNumber,
+          endColumn: e.selection.endColumn,
+        });
       }, 50),
     );
   };
 
-  const { status: connectionStatus, broadcastChange } = useCollaboration(
-    id || '',
-    (newCode) => {
-      if (editorRef.current && editorRef.current.getValue() !== newCode) {
-        isRemoteUpdate.current = true;
-        const position = editorRef.current.getPosition();
-        editorRef.current.setValue(newCode);
-        editorRef.current.setPosition(position);
-      }
-      setCode(newCode);
-    },
-    (newCode, newLanguage) => {
-      if (editorRef.current && editorRef.current.getValue() !== newCode) {
-        isRemoteUpdate.current = true;
-        editorRef.current.setValue(newCode);
-      }
-      setCode(newCode);
-      setLanguage(newLanguage);
-    },
-  );
-
-  // Handle remote cursors and selections
-  useEffect(() => {
-    if (!editorRef.current || !monacoRef.current) return;
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-
-    const decorations: any[] = [];
-    const styleId = 'monaco-presence-styles';
-    let styleEl = document.getElementById(styleId);
-
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      document.head.appendChild(styleEl);
-    }
-
-    let css = '';
-
-    participants.forEach((p) => {
-      if (p.socketId === socket.id) return;
-
-      css += `
-        .selection-${p.socketId} {
-          background-color: ${p.color}40;
-        }
-        .cursor-${p.socketId} {
-          border-left: 2px solid ${p.color};
-          position: relative;
-          z-index: 9;
-        }
-      `;
-
-      if (
-        p.selection &&
-        (p.selection.startLineNumber !== p.selection.endLineNumber ||
-          p.selection.startColumn !== p.selection.endColumn)
-      ) {
-        decorations.push({
-          range: new monaco.Range(
-            p.selection.startLineNumber,
-            p.selection.startColumn,
-            p.selection.endLineNumber,
-            p.selection.endColumn,
-          ),
-          options: {
-            className: `selection-${p.socketId}`,
-            hoverMessage: { value: p.username },
-          },
-        });
-      }
-
-      if (p.cursor) {
-        decorations.push({
-          range: new monaco.Range(p.cursor.line, p.cursor.column, p.cursor.line, p.cursor.column),
-          options: {
-            className: `cursor-${p.socketId}`,
-            hoverMessage: { value: p.username },
-          },
-        });
-      }
-    });
-
-    styleEl.innerHTML = css;
-
-    if (!decorationsCollectionRef.current) {
-      decorationsCollectionRef.current = editor.createDecorationsCollection(decorations);
-    } else {
-      decorationsCollectionRef.current.set(decorations);
-    }
-
-    return () => {};
-  }, [participants]);
-
-  useEffect(() => {
-    return () => {
-      const styleEl = document.getElementById('monaco-presence-styles');
-      if (styleEl) styleEl.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!id) return;
-    const fetchInitialData = async () => {
-      try {
-        const [roomData, codeData] = await Promise.all([getRoomById(id), getRoomCode(id)]);
-        setRoom(roomData);
-        setCode(codeData.code);
-        setLanguage(codeData.language);
-        setTimeout(() => {
-          isInitialized.current = true;
-        }, 500);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to load room');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchInitialData();
-  }, [id]);
-
-  const handleEditorChange = (value: string | undefined) => {
-    const newCode = value || '';
+  const handleEditorChange = (newCode: string | undefined) => {
+    if (newCode === undefined) return;
 
     if (isRemoteUpdate.current) {
       isRemoteUpdate.current = false;
@@ -287,29 +219,29 @@ export function RoomDetail() {
     }
 
     setCode(newCode);
-
-    if (socket.connected && id) {
-      if (!typingRef.current) {
-        typingRef.current = true;
-        socket.emit('typing:start', { roomId: id });
-      }
+    if (activeFileId) {
+      onEdit(activeFileId, newCode, language);
+      broadcastCodeChange(newCode);
+      setTypingStatus(true);
       handleTypingStop();
     }
-
-    if (isInitialized.current) {
-      onEdit(newCode, language);
-      broadcastChange(newCode);
-    }
   };
 
-  const handleLanguageChange = (newLanguage: string) => {
-    setLanguage(newLanguage);
-    if (isInitialized.current) {
-      saveToBackend(code, newLanguage);
+  const handleTypingStop = useCallback(
+    debounce(() => {
+      setTypingStatus(false);
+    }, 2000),
+    [setTypingStatus],
+  );
+
+  const handleTabClick = (fileId: string) => {
+    if (editorRef.current && activeFileId) {
+      viewStates.current.set(activeFileId, editorRef.current.saveViewState());
     }
+    setActiveFileId(fileId);
   };
 
-  if (loading) {
+  if (loading || treeLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950 text-white">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -333,9 +265,12 @@ export function RoomDetail() {
       <RoomHeader
         roomName={room.name}
         language={language}
-        onLanguageChange={handleLanguageChange}
+        onLanguageChange={(lang) => {
+          setLanguage(lang);
+          if (activeFileId) updateNode(activeFileId, { language: lang });
+        }}
         saveState={saveState}
-        connectionStatus={connectionStatus}
+        connectionStatus={socket.connected ? 'Connected' : 'Disconnected'}
         onRun={handleRun}
         isRunning={isExecuting}
         editorSettings={settings}
@@ -343,28 +278,99 @@ export function RoomDetail() {
         resetLayout={handleResetLayout}
       />
       <div className="flex flex-1 overflow-hidden relative">
+        {/* Left Sidebar: Explorer */}
+        <div
+          style={{ width: isExplorerOpen ? `${explorer.size}px` : undefined }}
+          className="flex-shrink-0 bg-[#181818] hidden md:block z-10"
+        >
+          <Explorer
+            nodes={nodes}
+            activeFileId={activeFileId}
+            onOpenFile={(node) => {
+              if (editorRef.current && activeFileId) {
+                viewStates.current.set(activeFileId, editorRef.current.saveViewState());
+              }
+              openFile(node);
+            }}
+            onCreateFile={async (parentId) => {
+              const name = prompt('File name:');
+              if (name) {
+                const parts = name.split('.');
+                const ext = parts.length > 1 ? parts.pop() : 'txt';
+                let lang = 'txt';
+                if (ext === 'js') lang = 'javascript';
+                if (ext === 'ts') lang = 'typescript';
+                if (ext === 'py') lang = 'python';
+                if (ext === 'cpp') lang = 'cpp';
+                if (ext === 'java') lang = 'java';
+                if (ext === 'go') lang = 'go';
+                if (ext === 'rs') lang = 'rust';
+                await createNode(parentId, 'FILE', name, lang);
+              }
+            }}
+            onCreateFolder={async (parentId) => {
+              const name = prompt('Folder name:');
+              if (name) await createNode(parentId, 'FOLDER', name);
+            }}
+            onRename={async (nodeId, newName) => {
+              await updateNode(nodeId, { name: newName });
+            }}
+            onDelete={async (nodeId) => {
+              await deleteNode(nodeId);
+            }}
+            isOpen={isExplorerOpen}
+            setIsOpen={setIsExplorerOpen}
+          />
+        </div>
+
+        {/* Explorer Divider */}
+        {isExplorerOpen && (
+          <div
+            className={twMerge(
+              'w-1 cursor-col-resize z-50 transition-colors duration-150 flex-shrink-0 hidden md:block',
+              explorer.isDragging
+                ? 'bg-blue-500'
+                : 'hover:bg-blue-400/50 bg-gray-800 border-x border-gray-900',
+            )}
+            onPointerDown={explorer.handlePointerDown}
+          />
+        )}
+
         <main className="flex-1 flex flex-col relative min-w-0">
+          <EditorTabs
+            tabs={openTabs}
+            activeFileId={activeFileId}
+            onTabClick={handleTabClick}
+            onTabClose={(id) => closeTab(id)}
+          />
+
           <div className="flex-1 relative hidden md:block min-h-0">
-            <MonacoEditor
-              language={language}
-              value={code}
-              onChange={handleEditorChange}
-              onMount={handleEditorMount}
-              theme={settings.theme}
-              customOptions={{
-                minimap: { enabled: settings.minimap },
-                wordWrap: settings.wordWrap ? 'on' : 'off',
-                lineNumbers: settings.lineNumbers ? 'on' : 'off',
-                renderLineHighlight: settings.highlightActiveLine ? 'all' : 'none',
-                fontSize: settings.fontSize,
-              }}
-            />
+            {activeFileId ? (
+              <MonacoEditor
+                language={language}
+                value={code}
+                onChange={handleEditorChange}
+                onMount={handleEditorMount}
+                theme={settings.theme}
+                customOptions={{
+                  minimap: { enabled: settings.minimap },
+                  wordWrap: settings.wordWrap ? 'on' : 'off',
+                  lineNumbers: settings.lineNumbers ? 'on' : 'off',
+                  renderLineHighlight: settings.highlightActiveLine ? 'all' : 'none',
+                  fontSize: settings.fontSize,
+                }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-gray-500 bg-[#1e1e1e]">
+                <div className="text-center">
+                  <p className="mb-2">No file is open.</p>
+                  <p className="text-sm">Select a file from the explorer or create a new one.</p>
+                </div>
+              </div>
+            )}
+
             {/* Global overlay while dragging to protect iframe/editor */}
             {isDraggingAny && <div className="absolute inset-0 z-40 bg-transparent" />}
-          </div>
-
-          <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
-            <p className="text-gray-400">Editing is best experienced on desktop.</p>
           </div>
 
           <div className="flex flex-col flex-shrink-0 z-10 hidden md:flex min-h-0">
@@ -408,7 +414,7 @@ export function RoomDetail() {
           style={{ width: `${sidebar.size}px` }}
         >
           <div className="flex-1 overflow-hidden flex flex-col min-h-0 relative">
-            <ParticipantPanel participants={participants} />
+            <ParticipantPanel participants={participants} nodes={nodes} />
           </div>
 
           {/* Horizontal divider for Chat */}

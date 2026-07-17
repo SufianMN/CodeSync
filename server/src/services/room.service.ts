@@ -13,10 +13,11 @@ export class RoomService {
         },
       });
 
-      await tx.roomFile.create({
+      await tx.workspaceNode.create({
         data: {
           roomId: newRoom.id,
-          filename,
+          type: 'FILE',
+          name: filename,
           language: data.language,
           content: '',
         },
@@ -43,14 +44,14 @@ export class RoomService {
     const rooms = await prisma.room.findMany({
       where: { members: { some: { userId } } },
       orderBy: { createdAt: 'desc' },
-      include: { files: { take: 1 } },
+      include: { workspaceNodes: { where: { type: 'FILE' }, take: 1 } },
     });
 
     return rooms.map((room) => ({
       id: room.id,
       name: room.name,
       ownerId: room.ownerId,
-      language: room.files[0]?.language || 'cpp',
+      language: room.workspaceNodes[0]?.language || 'cpp',
       createdAt: room.createdAt,
     }));
   }
@@ -58,7 +59,7 @@ export class RoomService {
   static async getRoomById(roomId: string, userId: string) {
     const room = await prisma.room.findUnique({
       where: { id: roomId },
-      include: { files: { take: 1 } },
+      include: { workspaceNodes: { where: { type: 'FILE' }, take: 1 } },
     });
 
     if (!room) {
@@ -72,7 +73,7 @@ export class RoomService {
       create: { roomId, userId },
     });
 
-    const primaryFile = room.files[0];
+    const primaryFile = room.workspaceNodes[0];
 
     return {
       id: room.id,
@@ -143,7 +144,7 @@ export class RoomService {
   static async getRoomCode(roomId: string, userId: string) {
     const room = await prisma.room.findUnique({
       where: { id: roomId },
-      include: { files: { take: 1 } },
+      include: { workspaceNodes: { where: { type: 'FILE' }, take: 1 } },
     });
 
     if (!room) {
@@ -157,7 +158,7 @@ export class RoomService {
       create: { roomId, userId },
     });
 
-    const primaryFile = room.files[0];
+    const primaryFile = room.workspaceNodes[0];
     if (!primaryFile) {
       throw Object.assign(new Error('No code file found for this room'), { statusCode: 404 });
     }
@@ -175,7 +176,7 @@ export class RoomService {
   ) {
     const room = await prisma.room.findUnique({
       where: { id: roomId },
-      include: { files: { take: 1 } },
+      include: { workspaceNodes: { where: { type: 'FILE' }, take: 1 } },
     });
 
     if (!room) {
@@ -189,17 +190,17 @@ export class RoomService {
       throw Object.assign(new Error('Forbidden: Not a member'), { statusCode: 403 });
     }
 
-    const primaryFile = room.files[0];
+    const primaryFile = room.workspaceNodes[0];
     if (!primaryFile) {
       throw Object.assign(new Error('No code file found for this room'), { statusCode: 404 });
     }
 
-    await prisma.roomFile.update({
+    await prisma.workspaceNode.update({
       where: { id: primaryFile.id },
       data: {
         content: data.code,
         language: data.language,
-        filename: `main.${this.getExtension(data.language)}`,
+        name: `main.${this.getExtension(data.language)}`,
       },
     });
 

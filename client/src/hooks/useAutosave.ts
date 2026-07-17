@@ -1,32 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { updateRoomCode } from '../api/rooms';
+import { updateNode } from '../api/workspace.api';
 import toast from 'react-hot-toast';
 
 export type SaveState = 'Saved' | 'Saving...' | 'Unsaved Changes' | 'Failed to save';
 
-export function useAutosave(roomId: string) {
+export function useAutosave() {
   const [saveState, setSaveState] = useState<SaveState>('Saved');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestData = useRef<{ code: string; language: string } | null>(null);
+  const latestData = useRef<{ nodeId: string; code: string; language: string } | null>(null);
 
-  const saveToBackend = useCallback(
-    async (code: string, language: string) => {
-      setSaveState('Saving...');
-      try {
-        await updateRoomCode(roomId, code, language);
-        setSaveState('Saved');
-      } catch (error) {
-        console.error('Autosave failed', error);
-        setSaveState('Failed to save');
-        toast.error('Failed to save changes');
-      }
-    },
-    [roomId],
-  );
+  const saveToBackend = useCallback(async (nodeId: string, code: string, language: string) => {
+    setSaveState('Saving...');
+    try {
+      await updateNode(nodeId, { content: code, language });
+      setSaveState('Saved');
+    } catch (error) {
+      console.error('Autosave failed', error);
+      setSaveState('Failed to save');
+      toast.error('Failed to save changes');
+    }
+  }, []);
 
   const onEdit = useCallback(
-    (code: string, language: string) => {
-      latestData.current = { code, language };
+    (nodeId: string, code: string, language: string) => {
+      latestData.current = { nodeId, code, language };
       setSaveState('Unsaved Changes');
 
       if (timerRef.current) {
@@ -35,7 +32,11 @@ export function useAutosave(roomId: string) {
 
       timerRef.current = setTimeout(() => {
         if (latestData.current) {
-          saveToBackend(latestData.current.code, latestData.current.language);
+          saveToBackend(
+            latestData.current.nodeId,
+            latestData.current.code,
+            latestData.current.language,
+          );
         }
       }, 2000);
     },
