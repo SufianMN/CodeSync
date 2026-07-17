@@ -2,15 +2,24 @@ import { useEffect, useState, useRef } from 'react';
 import { createTLStore, defaultShapeUtils, TLStore, getSnapshot, loadSnapshot } from 'tldraw';
 import { socket } from '../socket/socket';
 import { debounce } from '../utils/throttle';
+import { SaveState } from './useAutosave';
 
 export function useWhiteboardSync(roomId: string) {
   const [store] = useState<TLStore>(() => createTLStore({ shapeUtils: defaultShapeUtils }));
   const [isLoaded, setIsLoaded] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('Saved');
 
   // Debounced save function to persist snapshot
   const saveSnapshot = useRef(
     debounce((data: string) => {
-      socket.emit('whiteboard:save', { roomId, data });
+      setSaveState('Saving...');
+      socket.emit('whiteboard:save', { roomId, data }, (success: boolean) => {
+        if (success) {
+          setSaveState('Saved');
+        } else {
+          setSaveState('Failed to save');
+        }
+      });
     }, 5000), // autosave every 5 seconds of inactivity
   ).current;
 
@@ -63,18 +72,38 @@ export function useWhiteboardSync(roomId: string) {
     const unlisten = store.listen((event) => {
       if (event.source !== 'user') return; // Only broadcast user-initiated actions
 
+      const addedIds = Object.keys(event.changes.added);
+      const updatedIds = Object.keys(event.changes.updated);
+      const removedIds = Object.keys(event.changes.removed);
+
+      const isDocRecord = (id: string) =>
+        id.startsWith('shape:') ||
+        id.startsWith('binding:') ||
+        id.startsWith('asset:') ||
+        id.startsWith('page:') ||
+        id.startsWith('document:');
+
+      const isDocumentChange =
+        addedIds.some(isDocRecord) || updatedIds.some(isDocRecord) || removedIds.some(isDocRecord);
+
+      if (isDocumentChange) {
+        setSaveState('Unsaved Changes');
+      }
+
       const changes = {
         added: Object.values(event.changes.added),
         updated: Object.values(event.changes.updated).map((u) => u[1]),
-        removed: Object.keys(event.changes.removed),
+        removed: removedIds,
       };
 
       // Broadcast incremental update to peers
       socket.emit('whiteboard:update', { roomId, changes });
 
-      // Trigger debounced save for backend persistence
-      const snapshot = getSnapshot(store);
-      saveSnapshot(JSON.stringify(snapshot));
+      // Trigger debounced save for backend persistence only for document changes
+      if (isDocumentChange) {
+        const snapshot = getSnapshot(store);
+        saveSnapshot(JSON.stringify(snapshot));
+      }
     });
 
     return () => {
@@ -82,5 +111,5 @@ export function useWhiteboardSync(roomId: string) {
     };
   }, [store, roomId, isLoaded, saveSnapshot]);
 
-  return { store, isLoaded };
+  return { store, isLoaded, saveState };
 }

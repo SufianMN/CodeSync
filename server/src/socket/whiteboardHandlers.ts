@@ -22,15 +22,23 @@ export const registerWhiteboardHandlers = (socket: Socket) => {
   });
 
   // Client periodically saves the full snapshot
-  socket.on('whiteboard:save', async ({ roomId, data }: { roomId: string; data: string }) => {
-    try {
-      await prisma.whiteboardSnapshot.upsert({
-        where: { roomId },
-        update: { data },
-        create: { roomId, data },
-      });
-    } catch (error) {
-      console.error('Error saving whiteboard snapshot:', error);
-    }
-  });
+  socket.on(
+    'whiteboard:save',
+    async (
+      { roomId, data }: { roomId: string; data: string },
+      callback?: (success: boolean) => void,
+    ) => {
+      try {
+        await prisma.whiteboardSnapshot.upsert({
+          where: { roomId },
+          update: { data },
+          create: { roomId, data },
+        });
+        if (callback) callback(true);
+      } catch (error) {
+        console.error('Error saving whiteboard snapshot:', error);
+        if (callback) callback(false);
+      }
+    },
+  );
 };

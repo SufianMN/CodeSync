@@ -61,13 +61,13 @@ export function RoomHeader({
           ) : (
             <PenTool className="h-5 w-5 text-purple-500 flex-shrink-0" />
           )}
-          <h1 className="font-semibold text-white truncate" title={roomName}>
+          <h1 className="font-semibold text-2xl text-white truncate" title={roomName}>
             {roomName}
           </h1>
         </div>
       </div>
 
-      <div className="flex items-center space-x-4 flex-1 justify-end sm:space-x-4">
+      <div className="flex items-center space-x-4 flex-shrink-0 justify-end sm:space-x-4">
         {activeView === 'code' && (
           <>
             {onLanguageChange && language !== undefined && (
@@ -185,42 +185,42 @@ export function RoomHeader({
           <span className="hidden sm:inline">Share</span>
         </button>
 
-        <div className="hidden sm:flex items-center space-x-2 text-sm font-medium w-[120px]">
+        <div className="hidden sm:flex items-center text-sm font-medium w-[120px]">
           <span
             className={`
-              flex items-center space-x-1.5 transition-colors duration-300
+              flex items-center space-x-2 transition-colors duration-300
               ${connectionStatus === 'Connected' ? 'text-green-400' : ''}
               ${connectionStatus === 'Connecting...' ? 'text-blue-400' : ''}
               ${connectionStatus === 'Disconnected' ? 'text-red-400' : ''}
             `}
           >
-            <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+            <span className="relative flex h-2.5 w-2.5 items-center justify-center flex-shrink-0">
               <span
                 className={`absolute inline-flex h-full w-full rounded-full bg-current opacity-75 ${connectionStatus === 'Connecting...' ? 'animate-ping' : ''}`}
               ></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
             </span>
-            <span className="w-24 truncate">{connectionStatus}</span>
+            <span className="truncate">{connectionStatus}</span>
           </span>
         </div>
 
-        <div className="hidden sm:flex items-center space-x-2 text-sm font-medium w-[130px]">
+        <div className="hidden sm:flex items-center text-sm font-medium w-[140px]">
           <span
             className={`
-              flex items-center space-x-1.5 transition-colors duration-300
+              flex items-center space-x-2 transition-colors duration-300
               ${saveState === 'Saved' ? 'text-green-400' : ''}
               ${saveState === 'Saving...' ? 'text-blue-400' : ''}
               ${saveState === 'Unsaved Changes' ? 'text-yellow-400' : ''}
               ${saveState === 'Failed to save' ? 'text-red-400' : ''}
             `}
           >
-            <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+            <span className="relative flex h-2.5 w-2.5 items-center justify-center flex-shrink-0">
               <span
                 className={`absolute inline-flex h-full w-full rounded-full bg-current opacity-75 ${saveState === 'Saving...' || saveState === 'Unsaved Changes' ? 'animate-ping' : ''}`}
               ></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
             </span>
-            <span className="w-28 truncate">{saveState}</span>
+            <span className="truncate">{saveState}</span>
           </span>
         </div>
       </div>

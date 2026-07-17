@@ -29,11 +29,16 @@ export function RoomWhiteboard() {
     () => {},
   );
 
-  const { store, isLoaded } = useWhiteboardSync(roomId);
+  const { store, isLoaded, saveState } = useWhiteboardSync(roomId);
 
   return (
     <div className="flex h-screen flex-col bg-[#1e1e1e]">
-      <RoomHeader roomName={roomName} connectionStatus={connectionStatus} activeView="whiteboard" />
+      <RoomHeader
+        roomName={roomName}
+        connectionStatus={connectionStatus}
+        saveState={saveState}
+        activeView="whiteboard"
+      />
 
       <div className="flex flex-1 overflow-hidden relative">
         <ActivityBar activeView="whiteboard" />
