@@ -12,6 +12,7 @@ import { ChatPanel } from '../components/Chat/ChatPanel';
 import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
 import { Explorer } from '../components/Workspace/Explorer';
 import { EditorTabs } from '../components/Workspace/EditorTabs';
+import { ActivityBar } from '../components/Workspace/ActivityBar';
 import { executeCode, ExecuteResponse } from '../api/execute';
 import { throttle, debounce } from '../utils/throttle';
 import { socket } from '../socket/socket';
@@ -299,6 +300,8 @@ export function RoomDetail() {
         resetLayout={handleResetLayout}
       />
       <div className="flex flex-1 overflow-hidden relative">
+        <ActivityBar activeView="code" />
+
         {/* Left Sidebar: Explorer */}
         <div
           style={{ width: isExplorerOpen ? `${explorer.size}px` : undefined }}

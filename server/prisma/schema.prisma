@@ -31,6 +31,7 @@ model Room {
   members  RoomMember[]
   workspaceNodes WorkspaceNode[]
   messages Message[]
+  whiteboardSnapshot WhiteboardSnapshot?
 
   @@index([ownerId])
 }
@@ -80,4 +81,15 @@ model Message {
 
   @@index([roomId])
   @@index([createdAt])
+}
+
+model WhiteboardSnapshot {
+  id        String   @id @default(uuid())
+  roomId    String   @unique
+  data      String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
 }

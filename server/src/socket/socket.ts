@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { socketAuthMiddleware, AuthenticatedSocket } from './auth';
 import { registerRoomHandlers } from './roomHandlers';
+import { registerWhiteboardHandlers } from './whiteboardHandlers';
 
 export const initializeSocket = (fastify: FastifyInstance) => {
   const io = new Server(fastify.server, {
@@ -23,6 +24,7 @@ export const initializeSocket = (fastify: FastifyInstance) => {
 
     // Register handlers
     registerRoomHandlers(io, authSocket);
+    registerWhiteboardHandlers(authSocket);
 
     socket.on('disconnect', () => {
       // Cleanup handled implicitly, can add logging if desired

@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { RoomDetail } from './pages/RoomDetail';
+import { RoomWhiteboard } from './pages/RoomWhiteboard';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/room/:id" element={<RoomDetail />} />
+            <Route path="/room/:id/whiteboard" element={<RoomWhiteboard />} />
           </Route>
         </Routes>
       </BrowserRouter>
