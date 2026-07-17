@@ -6,6 +6,7 @@ import { CreateRoomModal } from '../components/CreateRoomModal';
 import { JoinRoomModal } from '../components/JoinRoomModal';
 import { Trash2, Edit2, Code2, Plus, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { toastConfirm } from '../utils/toastPrompt';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -35,7 +36,7 @@ export function Dashboard() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this room?')) return;
+    if (!(await toastConfirm('Are you sure you want to delete this room?'))) return;
     try {
       await deleteRoom(id);
       // Fetch rooms again to ensure UI matches DB exactly

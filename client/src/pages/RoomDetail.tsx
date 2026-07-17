@@ -19,7 +19,7 @@ import { useWorkspace } from '../hooks/useWorkspace';
 import { useEditorSettings } from '../hooks/useEditorSettings';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { twMerge } from 'tailwind-merge';
-
+import { toastPrompt } from '../utils/toastPrompt';
 export function RoomDetail() {
   const { id } = useParams<{ id: string }>();
   const roomId = id || '';
@@ -314,7 +314,7 @@ export function RoomDetail() {
               openFile(node);
             }}
             onCreateFile={async (parentId) => {
-              const name = prompt('File name:');
+              const name = await toastPrompt('File name:', '', 'top-left');
               if (name) {
                 const parts = name.split('.');
                 const ext = parts.length > 1 ? parts.pop() : 'txt';
@@ -330,7 +330,7 @@ export function RoomDetail() {
               }
             }}
             onCreateFolder={async (parentId) => {
-              const name = prompt('Folder name:');
+              const name = await toastPrompt('Folder name:', '', 'top-left');
               if (name) await createNode(parentId, 'FOLDER', name);
             }}
             onRename={async (nodeId, newName) => {

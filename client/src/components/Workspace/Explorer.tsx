@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown, File, FilePlus, FolderPlus, Trash, Edit2 } from 'lucide-react';
 import { WorkspaceNode } from '../../api/workspace.api';
 import { twMerge } from 'tailwind-merge';
+import { toastPrompt, toastConfirm } from '../../utils/toastPrompt';
 
 interface ExplorerProps {
   nodes: WorkspaceNode[];
@@ -110,9 +111,9 @@ export function Explorer({
               </>
             )}
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                const newName = prompt('Enter new name:', node.name);
+                const newName = await toastPrompt('Enter new name:', node.name, 'top-left');
                 if (newName && newName !== node.name) {
                   onRename(node.id, newName);
                 }
@@ -123,9 +124,11 @@ export function Explorer({
               <Edit2 className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                if (confirm(`Are you sure you want to delete ${node.name}?`)) {
+                if (
+                  await toastConfirm(`Are you sure you want to delete ${node.name}?`, 'top-left')
+                ) {
                   onDelete(node.id);
                 }
               }}
