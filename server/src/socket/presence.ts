@@ -127,7 +127,17 @@ export const PresenceManager = {
   getRoomParticipants(roomId: string): Participant[] {
     const room = presenceStore.get(roomId);
     if (!room) return [];
-    return Array.from(room.values());
+
+    const now = Date.now();
+    const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+    return Array.from(room.values()).map((p) => {
+      if (!p.idle && now - p.lastSeen >= IDLE_TIMEOUT_MS) {
+        p.idle = true;
+        p.typing = false;
+      }
+      return p;
+    });
   },
 
   getParticipant(roomId: string, socketId: string): Participant | undefined {

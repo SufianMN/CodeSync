@@ -61,29 +61,29 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket) =>
   socket.on('cursor:update', (payload: { roomId: string; cursor: any }) => {
     const { roomId, cursor } = payload;
     if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { cursor });
-    socket.to(roomId).emit('cursor:update', { socketId: socket.id, cursor });
+    PresenceManager.updateParticipant(roomId, socket.id, { cursor, idle: false });
+    io.to(roomId).emit('cursor:update', { socketId: socket.id, cursor });
   });
 
   socket.on('selection:update', (payload: { roomId: string; selection: any }) => {
     const { roomId, selection } = payload;
     if (!roomId) return;
-    PresenceManager.updateParticipant(roomId, socket.id, { selection });
-    socket.to(roomId).emit('selection:update', { socketId: socket.id, selection });
+    PresenceManager.updateParticipant(roomId, socket.id, { selection, idle: false });
+    io.to(roomId).emit('selection:update', { socketId: socket.id, selection });
   });
 
   socket.on('typing:start', (payload: { roomId: string }) => {
     const { roomId } = payload;
     if (!roomId) return;
     PresenceManager.updateParticipant(roomId, socket.id, { typing: true, idle: false });
-    socket.to(roomId).emit('typing:update', { socketId: socket.id, typing: true });
+    io.to(roomId).emit('typing:update', { socketId: socket.id, typing: true });
   });
 
   socket.on('typing:stop', (payload: { roomId: string }) => {
     const { roomId } = payload;
     if (!roomId) return;
     PresenceManager.updateParticipant(roomId, socket.id, { typing: false });
-    socket.to(roomId).emit('typing:update', { socketId: socket.id, typing: false });
+    io.to(roomId).emit('typing:update', { socketId: socket.id, typing: false });
   });
 
   socket.on('disconnecting', () => {

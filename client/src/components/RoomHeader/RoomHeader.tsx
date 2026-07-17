@@ -3,6 +3,7 @@ import { ArrowLeft, Code2, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SaveState } from '../../hooks/useAutosave';
 import { ConnectionStatus } from '../../hooks/useCollaboration';
+import { RunButton } from '../Execution/RunButton';
 
 interface RoomHeaderProps {
   roomName: string;
@@ -10,6 +11,8 @@ interface RoomHeaderProps {
   onLanguageChange: (lang: string) => void;
   saveState: SaveState;
   connectionStatus: ConnectionStatus;
+  onRun: () => void;
+  isRunning: boolean;
 }
 
 const LANGUAGES = [
@@ -28,6 +31,8 @@ export function RoomHeader({
   onLanguageChange,
   saveState,
   connectionStatus,
+  onRun,
+  isRunning,
 }: RoomHeaderProps) {
   const handleShare = () => {
     navigator.clipboard
@@ -62,6 +67,8 @@ export function RoomHeader({
             </option>
           ))}
         </select>
+
+        <RunButton onRun={onRun} isLoading={isRunning} />
 
         <button
           onClick={handleShare}

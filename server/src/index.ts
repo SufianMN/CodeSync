@@ -6,6 +6,7 @@ import cookie from '@fastify/cookie';
 import { prisma } from './utils/prisma';
 import authRoutes from './routes/auth.routes';
 import roomRoutes from './routes/room.routes';
+import { executeRoutes } from './routes/execute.routes';
 import { initializeSocket } from './socket/socket';
 
 const server = Fastify({
@@ -50,6 +51,7 @@ const start = async () => {
 
     await server.register(authRoutes, { prefix: '/api/auth' });
     await server.register(roomRoutes, { prefix: '/api/rooms' });
+    await server.register(executeRoutes, { prefix: '/api/execute' });
 
     server.get('/api/health', async (request, reply) => {
       try {

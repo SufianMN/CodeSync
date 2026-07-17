@@ -7,6 +7,8 @@ import { usePresence } from '../hooks/usePresence';
 import { RoomHeader } from '../components/RoomHeader/RoomHeader';
 import { MonacoEditor } from '../components/Editor/MonacoEditor';
 import { ParticipantPanel } from '../components/ParticipantPanel/ParticipantPanel';
+import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
+import { executeCode, ExecuteResponse } from '../api/execute';
 import { throttle, debounce } from '../utils/throttle';
 import { socket } from '../socket/socket';
 
@@ -18,6 +20,13 @@ export function RoomDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Execution states
+  const [stdin, setStdin] = useState('');
+  const [isExecutionPanelOpen, setIsExecutionPanelOpen] = useState(true);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [execResult, setExecResult] = useState<ExecuteResponse | null>(null);
+  const [execError, setExecError] = useState<string | null>(null);
+
   const { saveState, onEdit, saveToBackend } = useAutosave(id || '');
 
   const isInitialized = useRef(false);
@@ -25,13 +34,62 @@ export function RoomDetail() {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsCollectionRef = useRef<any>(null);
+  const typingRef = useRef(false);
 
   const { participants } = usePresence(id || '');
+
+  const handleRun = async () => {
+    if (isExecuting) return;
+    setIsExecuting(true);
+    setIsExecutionPanelOpen(true);
+    setExecError(null);
+    setExecResult(null);
+
+    try {
+      // Ensure the latest code is saved
+      await saveToBackend(code, language);
+
+      const result = await executeCode({
+        language,
+        code,
+        stdin,
+      });
+
+      setExecResult(result);
+    } catch (err: any) {
+      let errorMsg = 'Execution failed';
+
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (data.details) {
+          if (Array.isArray(data.details)) {
+            // Zod error array
+            errorMsg = data.details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
+          } else if (typeof data.details === 'object') {
+            // Other object
+            errorMsg = JSON.stringify(data.details, null, 2);
+          } else {
+            // String or primitive
+            errorMsg = String(data.details);
+          }
+        } else if (data.error) {
+          errorMsg = data.error;
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      setExecError(errorMsg);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
 
   const handleTypingStop = useCallback(
     debounce(() => {
       if (socket.connected && id) {
         socket.emit('typing:stop', { roomId: id });
+        typingRef.current = false;
       }
     }, 2000),
     [id],
@@ -40,6 +98,11 @@ export function RoomDetail() {
   const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Handle Ctrl+Enter
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      handleRun();
+    });
 
     editor.onDidChangeCursorPosition(
       throttle((e: any) => {
@@ -160,10 +223,7 @@ export function RoomDetail() {
       decorationsCollectionRef.current.set(decorations);
     }
 
-    return () => {
-      // Don't remove the style element completely on every render, just clear it if needed
-      // Cleanup happens when component unmounts
-    };
+    return () => {};
   }, [participants]);
 
   useEffect(() => {
@@ -204,7 +264,10 @@ export function RoomDetail() {
     setCode(newCode);
 
     if (socket.connected && id) {
-      socket.emit('typing:start', { roomId: id });
+      if (!typingRef.current) {
+        typingRef.current = true;
+        socket.emit('typing:start', { roomId: id });
+      }
       handleTypingStop();
     }
 
@@ -248,11 +311,14 @@ export function RoomDetail() {
         onLanguageChange={handleLanguageChange}
         saveState={saveState}
         connectionStatus={connectionStatus}
+        onRun={handleRun}
+        isRunning={isExecuting}
       />
       <div className="flex flex-1 overflow-hidden">
         <ParticipantPanel participants={participants} />
-        <main className="flex-1 relative">
-          <div className="absolute inset-0 hidden md:block">
+
+        <main className="flex-1 flex flex-col relative min-w-0">
+          <div className="flex-1 relative hidden md:block">
             <MonacoEditor
               language={language}
               value={code}
@@ -260,8 +326,21 @@ export function RoomDetail() {
               onMount={handleEditorMount}
             />
           </div>
+
           <div className="flex h-full items-center justify-center p-8 text-center md:hidden bg-gray-950 text-white">
             <p className="text-gray-400">Editing is best experienced on desktop.</p>
+          </div>
+
+          <div className="flex flex-col flex-shrink-0 z-10 hidden md:flex">
+            <ExecutionPanel
+              stdin={stdin}
+              setStdin={setStdin}
+              result={execResult}
+              isLoading={isExecuting}
+              error={execError}
+              isOpen={isExecutionPanelOpen}
+              setIsOpen={setIsExecutionPanelOpen}
+            />
           </div>
         </main>
       </div>
