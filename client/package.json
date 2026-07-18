@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@react-oauth/google": "^0.13.5",
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.42.2",
     "lucide-react": "^1.24.0",
     "monaco-editor": "^0.55.1",
     "react": "^19.2.7",

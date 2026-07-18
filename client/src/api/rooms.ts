@@ -7,6 +7,8 @@ export interface Room {
   language: string;
   code?: string;
   createdAt: string;
+  updatedAt?: string;
+  membersCount?: number;
 }
 
 export const createRoom = async (name: string, language: string): Promise<Room> => {

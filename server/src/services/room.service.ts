@@ -43,8 +43,11 @@ export class RoomService {
   static async getUserRooms(userId: string) {
     const rooms = await prisma.room.findMany({
       where: { members: { some: { userId } } },
-      orderBy: { createdAt: 'desc' },
-      include: { workspaceNodes: { where: { type: 'FILE' }, take: 1 } },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        workspaceNodes: { where: { type: 'FILE' }, take: 1 },
+        _count: { select: { members: true } },
+      },
     });
 
     return rooms.map((room) => ({
@@ -53,6 +56,8 @@ export class RoomService {
       ownerId: room.ownerId,
       language: room.workspaceNodes[0]?.language || 'cpp',
       createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+      membersCount: room._count.members,
     }));
   }
 
