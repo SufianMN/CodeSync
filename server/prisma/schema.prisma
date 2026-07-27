@@ -60,12 +60,15 @@ model WorkspaceNode {
   language    String?
   content     String?  @db.Text
   orderIndex  Int      @default(0)
+  timeLimitMs Int?     @default(1000)
+  memoryLimitMB Int?   @default(512)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   room        Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
   parent      WorkspaceNode?  @relation("ParentChild", fields: [parentId], references: [id], onDelete: Cascade)
   children    WorkspaceNode[] @relation("ParentChild")
+  testCases   TestCase[]
 
   @@index([roomId])
 }
@@ -93,4 +96,16 @@ model WhiteboardSnapshot {
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([roomId])
+}
+
+model TestCase {
+  id             String   @id @default(uuid())
+  fileId         String
+  input          String   @db.Text
+  expectedOutput String   @db.Text
+  order          Int      @default(0)
+
+  file           WorkspaceNode @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
 }

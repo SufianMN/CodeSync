@@ -13,7 +13,7 @@ import { ExecutionPanel } from '../components/Execution/ExecutionPanel';
 import { Explorer } from '../components/Workspace/Explorer';
 import { EditorTabs } from '../components/Workspace/EditorTabs';
 import { ActivityBar } from '../components/Workspace/ActivityBar';
-import { executeCode, ExecuteResponse } from '../api/execute';
+import { runTestCases, RunTestsResponse } from '../api/testcase.api';
 import { throttle, debounce } from '../utils/throttle';
 import { socket } from '../socket/socket';
 import { useWorkspace } from '../hooks/useWorkspace';
@@ -63,10 +63,9 @@ export function RoomDetail() {
   const { saveState, onEdit, saveToBackend } = useAutosave();
 
   // Execution states
-  const [stdin, setStdin] = useState('');
   const [isExecutionPanelOpen, setIsExecutionPanelOpen] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [execResult, setExecResult] = useState<ExecuteResponse | null>(null);
+  const [execResult, setExecResult] = useState<RunTestsResponse | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
 
   const { explorer, sidebar, terminal, chat, isDraggingAny, resetLayout } = useWorkspace();
@@ -179,7 +178,14 @@ export function RoomDetail() {
       }
 
       await saveToBackend(activeFileId, code, language);
-      const result = await executeCode({ language: language.toLowerCase(), code, stdin });
+      const timeLimitMs = activeNode?.timeLimitMs || 1000;
+      const memoryLimitMB = activeNode?.memoryLimitMB || 512;
+      const result = await runTestCases(activeFileId, {
+        language: language.toLowerCase(),
+        code,
+        timeLimitMs,
+        memoryLimitMB,
+      });
       setExecResult(result);
     } catch (err: any) {
       let errorMsg = 'Execution failed';
@@ -411,8 +417,9 @@ export function RoomDetail() {
               />
             )}
             <ExecutionPanel
-              stdin={stdin}
-              setStdin={setStdin}
+              activeFileId={activeFileId}
+              activeNode={activeNode}
+              updateNode={updateNode}
               result={execResult}
               isLoading={isExecuting}
               error={execError}

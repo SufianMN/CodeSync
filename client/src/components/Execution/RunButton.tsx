@@ -28,7 +28,7 @@ export function RunButton({ onRun, isLoading }: RunButtonProps) {
       ) : (
         <>
           <Play className="h-4 w-4 fill-current" />
-          <span>Run</span>
+          <span>Run Test Cases</span>
         </>
       )}
     </button>

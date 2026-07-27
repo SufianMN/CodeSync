@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes';
 import roomRoutes from './routes/room.routes';
 import { executeRoutes } from './routes/execute.routes';
 import { workspaceRoutes } from './routes/workspace.routes';
+import { testcaseRoutes } from './routes/testcase.routes';
 import { initializeSocket } from './socket/socket';
 
 const server = Fastify({
@@ -53,6 +54,7 @@ const start = async () => {
     await server.register(authRoutes, { prefix: '/api/auth' });
     await server.register(roomRoutes, { prefix: '/api/rooms' });
     await server.register(workspaceRoutes, { prefix: '/api/rooms' });
+    await server.register(testcaseRoutes, { prefix: '/api/workspace' });
     await server.register(executeRoutes, { prefix: '/api/execute' });
 
     server.get('/api/health', async (request, reply) => {

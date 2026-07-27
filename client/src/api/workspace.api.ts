@@ -9,6 +9,8 @@ export interface WorkspaceNode {
   language: string | null;
   content: string | null;
   orderIndex: number;
+  timeLimitMs?: number | null;
+  memoryLimitMB?: number | null;
   createdAt: string;
   updatedAt: string;
 }
