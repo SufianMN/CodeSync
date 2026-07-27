@@ -323,24 +323,26 @@ export function RoomDetail() {
               openFile(node);
             }}
             onCreateFile={async (parentId) => {
-              const name = await toastPrompt('File name:', '', 'top-left');
-              if (name) {
-                const parts = name.split('.');
-                const ext = parts.length > 1 ? parts.pop() : 'txt';
-                let lang = 'txt';
-                if (ext === 'js') lang = 'javascript';
-                if (ext === 'ts') lang = 'typescript';
-                if (ext === 'py') lang = 'python';
-                if (ext === 'cpp') lang = 'cpp';
-                if (ext === 'java') lang = 'java';
-                if (ext === 'go') lang = 'go';
-                if (ext === 'rs') lang = 'rust';
-                await createNode(parentId, 'FILE', name, lang);
-              }
+              await toastPrompt('File name:', '', 'top-left', async (name) => {
+                if (name) {
+                  const parts = name.split('.');
+                  const ext = parts.length > 1 ? parts.pop() : 'txt';
+                  let lang = 'txt';
+                  if (ext === 'js') lang = 'javascript';
+                  if (ext === 'ts') lang = 'typescript';
+                  if (ext === 'py') lang = 'python';
+                  if (ext === 'cpp') lang = 'cpp';
+                  if (ext === 'java') lang = 'java';
+                  if (ext === 'go') lang = 'go';
+                  if (ext === 'rs') lang = 'rust';
+                  await createNode(parentId, 'FILE', name, lang);
+                }
+              });
             }}
             onCreateFolder={async (parentId) => {
-              const name = await toastPrompt('Folder name:', '', 'top-left');
-              if (name) await createNode(parentId, 'FOLDER', name);
+              await toastPrompt('Folder name:', '', 'top-left', async (name) => {
+                if (name) await createNode(parentId, 'FOLDER', name);
+              });
             }}
             onRename={async (nodeId, newName) => {
               await updateNode(nodeId, { name: newName });

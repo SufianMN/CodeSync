@@ -113,10 +113,11 @@ export function Explorer({
             <button
               onClick={async (e) => {
                 e.stopPropagation();
-                const newName = await toastPrompt('Enter new name:', node.name, 'top-left');
-                if (newName && newName !== node.name) {
-                  onRename(node.id, newName);
-                }
+                await toastPrompt('Enter new name:', node.name, 'top-left', async (newName) => {
+                  if (newName && newName !== node.name) {
+                    await onRename(node.id, newName);
+                  }
+                });
               }}
               className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
               title="Rename"
