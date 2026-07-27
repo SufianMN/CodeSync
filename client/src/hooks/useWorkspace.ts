@@ -1,10 +1,10 @@
 import { useResizable } from './useResizable';
 
 export const WORKSPACE_DEFAULTS = {
-  explorerWidth: 240,
+  explorerWidth: 260,
   sidebarWidth: 320,
-  terminalHeight: 250,
-  chatHeight: 300,
+  terminalHeight: 320,
+  chatHeight: 400,
 };
 
 export function useWorkspace() {
@@ -13,7 +13,7 @@ export function useWorkspace() {
     initialSize: WORKSPACE_DEFAULTS.explorerWidth,
     minSize: 180,
     maxSize: 500,
-    localStorageKey: 'workspace_explorerWidth',
+    localStorageKey: 'workspace_v2_explorerWidth',
     reverse: false, // Pinned to the left
   });
 
@@ -22,7 +22,7 @@ export function useWorkspace() {
     initialSize: WORKSPACE_DEFAULTS.sidebarWidth,
     minSize: 280,
     maxSize: 800,
-    localStorageKey: 'workspace_sidebarWidth',
+    localStorageKey: 'workspace_v2_sidebarWidth',
     reverse: true, // Dragging left increases size because it's pinned to the right
   });
 
@@ -31,7 +31,7 @@ export function useWorkspace() {
     initialSize: WORKSPACE_DEFAULTS.terminalHeight,
     minSize: 150,
     maxSize: 800,
-    localStorageKey: 'workspace_terminalHeight',
+    localStorageKey: 'workspace_v2_terminalHeight',
     reverse: true, // Pinned to the bottom
   });
 
@@ -40,7 +40,7 @@ export function useWorkspace() {
     initialSize: WORKSPACE_DEFAULTS.chatHeight,
     minSize: 180,
     maxSize: 800,
-    localStorageKey: 'workspace_chatHeight',
+    localStorageKey: 'workspace_v2_chatHeight',
     reverse: true, // Pinned to the bottom (below Participants)
   });
 

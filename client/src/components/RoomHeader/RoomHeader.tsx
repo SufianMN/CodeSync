@@ -50,18 +50,18 @@ export function RoomHeader({
   };
 
   return (
-    <header className="flex flex-shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900 p-4 shadow-sm z-10">
-      <div className="flex items-center space-x-4 flex-1 min-w-0 pr-4">
+    <header className="flex flex-shrink-0 items-center justify-between border-b border-gray-800 bg-gray-900 px-4 py-1 shadow-sm z-10">
+      <div className="flex items-center space-x-3 flex-1 min-w-0 pr-4">
         <Link to="/dashboard" className="rounded p-1 hover:bg-gray-800 transition flex-shrink-0">
           <ArrowLeft className="h-5 w-5 text-gray-400" />
         </Link>
         <div className="flex items-center space-x-2 min-w-0">
           {activeView === 'code' ? (
-            <Code2 className="h-5 w-5 text-blue-500 flex-shrink-0" />
+            <Code2 className="h-7 w-7 text-blue-500 flex-shrink-0" />
           ) : (
-            <PenTool className="h-5 w-5 text-purple-500 flex-shrink-0" />
+            <PenTool className="h-7 w-7 text-purple-500 flex-shrink-0" />
           )}
-          <h1 className="font-semibold text-2xl text-white truncate" title={roomName}>
+          <h1 className="font-semibold text-3xl text-white truncate leading-none" title={roomName}>
             {roomName}
           </h1>
         </div>
