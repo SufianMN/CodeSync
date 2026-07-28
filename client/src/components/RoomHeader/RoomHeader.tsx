@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Code2, Share2, Minus, Plus, Settings, Check, PenTool } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
 import toast from 'react-hot-toast';
 import { SaveState } from '../../hooks/useAutosave';
 import { ConnectionStatus } from '../../hooks/useCollaboration';
@@ -18,6 +19,8 @@ interface RoomHeaderProps {
   updateSetting?: (key: string, value: any) => void;
   resetLayout?: () => void;
   activeView?: 'code' | 'whiteboard';
+  runMode?: 'testcases' | 'output';
+  onRunModeChange?: (mode: 'testcases' | 'output') => void;
 }
 
 const LANGUAGES = [
@@ -39,6 +42,8 @@ export function RoomHeader({
   updateSetting,
   resetLayout,
   activeView = 'code',
+  runMode,
+  onRunModeChange,
 }: RoomHeaderProps) {
   const [showSettings, setShowSettings] = useState(false);
 
@@ -84,7 +89,36 @@ export function RoomHeader({
               </select>
             )}
 
-            {onRun && isRunning !== undefined && <RunButton onRun={onRun} isLoading={isRunning} />}
+            {onRunModeChange && runMode && (
+              <div className="flex items-center rounded bg-gray-800 text-gray-300 text-sm font-medium border border-gray-700 overflow-hidden">
+                <button
+                  onClick={() => onRunModeChange('testcases')}
+                  className={twMerge(
+                    'px-3 py-1.5 transition whitespace-nowrap',
+                    runMode === 'testcases' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700',
+                  )}
+                >
+                  Test Cases
+                </button>
+                <button
+                  onClick={() => onRunModeChange('output')}
+                  className={twMerge(
+                    'px-3 py-1.5 transition whitespace-nowrap',
+                    runMode === 'output' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700',
+                  )}
+                >
+                  Terminal
+                </button>
+              </div>
+            )}
+
+            {onRun && isRunning !== undefined && (
+              <RunButton
+                onRun={onRun}
+                isLoading={isRunning}
+                label={runMode === 'output' ? 'Run' : 'Run Test Cases'}
+              />
+            )}
 
             {updateSetting && editorSettings && (
               <>

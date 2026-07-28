@@ -67,6 +67,7 @@ export function RoomDetail() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [execResult, setExecResult] = useState<RunTestsResponse | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
+  const [runMode, setRunMode] = useState<'testcases' | 'output'>('testcases');
 
   const { explorer, sidebar, terminal, chat, isDraggingAny, resetLayout } = useWorkspace();
   const { settings, updateSetting, resetSettings } = useEditorSettings();
@@ -180,35 +181,56 @@ export function RoomDetail() {
       await saveToBackend(activeFileId, code, language);
       const timeLimitMs = activeNode?.timeLimitMs || 1000;
       const memoryLimitMB = activeNode?.memoryLimitMB || 512;
-      const result = await runTestCases(activeFileId, {
-        language: language.toLowerCase(),
-        code,
-        timeLimitMs,
-        memoryLimitMB,
-      });
-      setExecResult(result);
-    } catch (err: any) {
-      let errorMsg = 'Execution failed';
-      if (err.response?.data?.details) {
+
+      if (runMode === 'output') {
+        // Emit the raw interactive execution over WebSocket
+        socket.emit(
+          'terminal:execute',
+          {
+            roomId,
+            fileId: activeFileId,
+            language: language.toLowerCase(),
+            code,
+          },
+          (res: { success: boolean; error?: string }) => {
+            if (!res.success) {
+              console.error('Interactive terminal execution failed:', res.error);
+            }
+          },
+        );
+      } else {
         try {
-          const details =
-            typeof err.response.data.details === 'string'
-              ? JSON.parse(err.response.data.details)
-              : err.response.data.details;
-          if (Array.isArray(details) && details[0]?.message) {
-            errorMsg = details.map((d: any) => d.message).join('\n');
-          } else {
-            errorMsg = JSON.stringify(details, null, 2);
+          const result = await runTestCases(activeFileId, {
+            language: language.toLowerCase(),
+            code,
+            timeLimitMs,
+            memoryLimitMB,
+          });
+          setExecResult(result);
+        } catch (err: any) {
+          let errorMsg = 'Execution failed';
+          if (err.response?.data?.details) {
+            try {
+              const details =
+                typeof err.response.data.details === 'string'
+                  ? JSON.parse(err.response.data.details)
+                  : err.response.data.details;
+              if (Array.isArray(details) && details[0]?.message) {
+                errorMsg = details.map((d: any) => d.message).join('\n');
+              } else {
+                errorMsg = JSON.stringify(details, null, 2);
+              }
+            } catch {
+              errorMsg = JSON.stringify(err.response.data.details, null, 2);
+            }
+          } else if (err.response?.data?.error) {
+            errorMsg = err.response.data.error;
+          } else if (err.message) {
+            errorMsg = err.message;
           }
-        } catch {
-          errorMsg = JSON.stringify(err.response.data.details, null, 2);
+          setExecError(errorMsg);
         }
-      } else if (err.response?.data?.error) {
-        errorMsg = err.response.data.error;
-      } else if (err.message) {
-        errorMsg = err.message;
       }
-      setExecError(errorMsg);
     } finally {
       setIsExecuting(false);
     }
@@ -304,6 +326,9 @@ export function RoomDetail() {
         editorSettings={settings}
         updateSetting={updateSetting}
         resetLayout={handleResetLayout}
+        activeView="code"
+        runMode={runMode}
+        onRunModeChange={setRunMode}
       />
       <div className="flex flex-1 overflow-hidden relative">
         <ActivityBar activeView="code" />
@@ -428,6 +453,7 @@ export function RoomDetail() {
               isOpen={isExecutionPanelOpen}
               setIsOpen={setIsExecutionPanelOpen}
               height={terminal.size}
+              runMode={runMode}
             />
           </div>
         </main>

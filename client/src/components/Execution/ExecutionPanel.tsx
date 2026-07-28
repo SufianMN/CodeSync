@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   RunTestsResponse,
-  TestCaseResult,
   TestCase,
   getTestCases,
   createTestCase,
   updateTestCase,
   deleteTestCase,
 } from '../../api/testcase.api';
+import { TerminalOutput } from './TerminalOutput';
 import {
   Terminal,
   Settings2,
@@ -38,6 +38,7 @@ interface ExecutionPanelProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   height: number;
+  runMode: 'testcases' | 'output';
 }
 
 export function ExecutionPanel({
@@ -50,8 +51,9 @@ export function ExecutionPanel({
   isOpen,
   setIsOpen,
   height,
+  runMode,
 }: ExecutionPanelProps) {
-  const [activeTab, setActiveTab] = useState<'testcases' | 'results'>('testcases');
+  const [activeTab, setActiveTab] = useState<'testcases' | 'results' | 'output'>('testcases');
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [loadingCases, setLoadingCases] = useState(false);
 
@@ -96,11 +98,23 @@ export function ExecutionPanel({
   };
 
   useEffect(() => {
+    if (runMode === 'output') {
+      setActiveTab('output');
+    } else if (activeTab === 'output') {
+      setActiveTab('testcases');
+    }
+  }, [runMode]);
+
+  useEffect(() => {
     if (isLoading || result || error) {
-      setActiveTab('results');
+      if (runMode === 'output' || (error && error.includes('No test cases found'))) {
+        setActiveTab('output');
+      } else {
+        setActiveTab('results');
+      }
       setIsOpen(true);
     }
-  }, [isLoading, result, error, setIsOpen]);
+  }, [isLoading, result, error, runMode, setIsOpen]);
 
   const handleAddTestCase = async () => {
     if (!activeFileId || testCases.length >= 5) return;
@@ -167,31 +181,48 @@ export function ExecutionPanel({
       {/* Tabs Header */}
       <div className="flex items-center justify-between bg-[#1e1e1e] border-b border-gray-800 px-2 pt-2">
         <div className="flex space-x-1">
-          <button
-            onClick={() => setActiveTab('testcases')}
-            className={twMerge(
-              'px-4 py-2 text-sm font-medium flex items-center space-x-2 border-b-2 transition-colors',
-              activeTab === 'testcases'
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/50',
-            )}
-          >
-            <Settings2 className="h-4 w-4" />
-            <span>Test Cases</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('results')}
-            className={twMerge(
-              'px-4 py-2 text-sm font-medium flex items-center space-x-2 border-b-2 transition-colors',
-              activeTab === 'results'
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/50',
-            )}
-          >
-            <Terminal className="h-4 w-4" />
-            <span>Execution Results</span>
-            {isLoading && <Loader2 className="h-3 w-3 animate-spin ml-2 text-blue-400" />}
-          </button>
+          {runMode === 'testcases' ? (
+            <>
+              <button
+                onClick={() => setActiveTab('testcases')}
+                className={twMerge(
+                  'px-4 py-2 text-sm font-medium flex items-center space-x-2 border-b-2 transition-colors',
+                  activeTab === 'testcases'
+                    ? 'border-blue-500 text-white'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/50',
+                )}
+              >
+                <Settings2 className="h-4 w-4" />
+                <span>Test Cases</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('results')}
+                className={twMerge(
+                  'px-4 py-2 text-sm font-medium flex items-center space-x-2 border-b-2 transition-colors',
+                  activeTab === 'results'
+                    ? 'border-blue-500 text-white'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/50',
+                )}
+              >
+                <Terminal className="h-4 w-4" />
+                <span>Execution Results</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setActiveTab('output')}
+              className={twMerge(
+                'px-4 py-2 text-sm font-medium flex items-center space-x-2 border-b-2 transition-colors',
+                activeTab === 'output'
+                  ? 'border-blue-500 text-white'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/50',
+              )}
+            >
+              <Play className="h-4 w-4" />
+              <span>Interactive Output</span>
+              {isLoading && <Loader2 className="h-3 w-3 animate-spin ml-2 text-blue-400" />}
+            </button>
+          )}
         </div>
         <button
           onClick={() => setIsOpen(false)}
@@ -480,6 +511,10 @@ export function ExecutionPanel({
             )}
           </div>
         )}
+
+        <div style={{ display: activeTab === 'output' ? 'block' : 'none', height: '100%' }}>
+          <TerminalOutput />
+        </div>
       </div>
     </div>
   );

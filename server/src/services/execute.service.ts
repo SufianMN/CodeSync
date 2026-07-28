@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -49,7 +49,7 @@ const LANGUAGE_CONFIG = {
     image: 'python:3.10-slim',
     fileName: 'main.py',
     compileCommand: null,
-    runCommand: 'python3 main.py',
+    runCommand: 'python3 -u main.py',
   },
   java: {
     image: 'eclipse-temurin:17-jdk-jammy',
@@ -290,7 +290,7 @@ export const ExecuteService = {
         results.push({
           id: tc.id,
           status,
-          runtimeMs: status !== 'Compilation Error' ? runtimeMs : undefined,
+          runtimeMs,
           memoryMB: 0, // Placeholder as precise peak memory via docker is complex without additional tools
           expected: status === 'Wrong Answer' ? tc.expectedOutput : undefined,
           received: status === 'Wrong Answer' ? stdout : undefined,
@@ -306,5 +306,103 @@ export const ExecuteService = {
         console.error(`Failed to clean up temp dir ${tempDir}:`, e);
       }
     }
+  },
+
+  async streamCode(
+    language: keyof typeof LANGUAGE_CONFIG,
+    code: string,
+    onOutput: (data: string) => void,
+    onExit: (code: number) => void,
+  ): Promise<(input: string) => void> {
+    const config = LANGUAGE_CONFIG[language];
+    if (!config) throw new Error('Unsupported language');
+
+    const runId = crypto.randomBytes(16).toString('hex');
+    const tempDir = path.join(os.tmpdir(), `codesync_stream_${runId}`);
+
+    await fs.mkdir(tempDir, { recursive: true });
+    const sourceFile = path.join(tempDir, config.fileName);
+    await fs.writeFile(sourceFile, code, 'utf-8');
+
+    // 1. Compilation Step (if needed)
+    if (config.compileCommand) {
+      try {
+        await execFileAsync(
+          'docker',
+          [
+            'run',
+            '--rm',
+            '--network',
+            'none',
+            '--cpus',
+            '1',
+            '--memory',
+            '1024m',
+            '-v',
+            `${tempDir}:/app`,
+            '-w',
+            '/app',
+            config.image,
+            'sh',
+            '-c',
+            config.compileCommand,
+          ],
+          { timeout: 10000 },
+        );
+      } catch (error: any) {
+        const stderr = error.stderr || error.message || 'Compilation failed';
+        onOutput(`Compilation Error:\r\n${stderr}\r\n`);
+        onExit(1);
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(console.error);
+        return () => {}; // return empty input handler
+      }
+    }
+
+    // 2. Execution Step with streaming
+    const child = spawn('docker', [
+      'run',
+      '--rm',
+      '-i', // interactive, keeps stdin open
+      '--network',
+      'none',
+      '--cpus',
+      '1',
+      '--memory',
+      '512m',
+      '-v',
+      `${tempDir}:/app`,
+      '-w',
+      '/app',
+      config.image,
+      'sh',
+      '-c',
+      config.runCommand,
+    ]);
+
+    child.stdout.on('data', (data) => {
+      // Replace bare LFs with CRLF for xterm.js compatibility
+      const output = data.toString().replace(/(?<!\r)\n/g, '\r\n');
+      onOutput(output);
+    });
+
+    child.stderr.on('data', (data) => {
+      const output = data.toString().replace(/(?<!\r)\n/g, '\r\n');
+      onOutput(output);
+    });
+
+    child.on('close', (code) => {
+      onExit(code ?? 0);
+      fs.rm(tempDir, { recursive: true, force: true }).catch(console.error);
+    });
+
+    child.on('error', (err) => {
+      onOutput(`\r\nExecution error: ${err.message}\r\n`);
+    });
+
+    return (input: string) => {
+      if (child.stdin && !child.stdin.destroyed) {
+        child.stdin.write(input);
+      }
+    };
   },
 };

@@ -3,9 +3,10 @@ import { Play, Square } from 'lucide-react';
 interface RunButtonProps {
   onRun: () => void;
   isLoading: boolean;
+  label?: string;
 }
 
-export function RunButton({ onRun, isLoading }: RunButtonProps) {
+export function RunButton({ onRun, isLoading, label = 'Run' }: RunButtonProps) {
   return (
     <button
       onClick={onRun}
@@ -28,7 +29,7 @@ export function RunButton({ onRun, isLoading }: RunButtonProps) {
       ) : (
         <>
           <Play className="h-4 w-4 fill-current" />
-          <span>Run Test Cases</span>
+          <span>{label}</span>
         </>
       )}
     </button>
