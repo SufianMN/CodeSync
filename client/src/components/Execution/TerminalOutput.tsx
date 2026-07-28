@@ -34,22 +34,42 @@ export function TerminalOutput() {
 
     term.writeln('\x1b[38;5;240mReady for execution...\x1b[0m');
 
-    // Input to backend
+    // Input buffer for line-buffered input (since we lack a true PTY line discipline)
+    const inputBuffer = { current: '' };
+
     term.onData((data) => {
-      // Local echo for better UX since there's no PTY
-      let emitData = data;
-      if (data === '\r') {
-        term.write('\r\n');
-        emitData = '\n';
-      } else if (data === '\x7F') {
-        term.write('\b \b');
-      } else {
-        term.write(data);
-        // Handle pasted text with \r
-        emitData = data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      // Handle pasted text or Enter key
+      if (data.includes('\r') || data.includes('\n')) {
+        const normalized = data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = normalized.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+          if (i < lines.length - 1) {
+            // Line with a newline after it
+            inputBuffer.current += lines[i];
+            term.write(lines[i] + '\r\n');
+            socket.emit('terminal:input', { data: inputBuffer.current + '\n' });
+            inputBuffer.current = '';
+          } else {
+            // Last part
+            inputBuffer.current += lines[i];
+            term.write(lines[i]);
+          }
+        }
+        return;
       }
 
-      socket.emit('terminal:input', { data: emitData });
+      // Handle Backspace
+      if (data === '\x7F') {
+        if (inputBuffer.current.length > 0) {
+          inputBuffer.current = inputBuffer.current.slice(0, -1);
+          term.write('\b \b');
+        }
+      } else {
+        // Normal character
+        inputBuffer.current += data;
+        term.write(data);
+      }
     });
 
     const handleStart = () => {
